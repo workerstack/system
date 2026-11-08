@@ -36,6 +36,22 @@ describe("check <name>", () => {
 		expect(silent.rt.logs).toContain("go — not installed (expected 1.2.3)")
 	})
 
+	it("treats a check that times out as not installed and says so", () => {
+		const ctx = context({ go: dep() }, { timeouts: ["go --version"], which: { go: "/opt/go" } })
+		expect(checkCommand(ctx, "go", false)).toBe(1)
+		expect(ctx.rt.warnings).toContain("   go: check timed out: go --version")
+		expect(ctx.rt.logs).toContain("go — not installed (expected 1.2.3)")
+	})
+
+	it("parses the version with the check pattern when one is set", () => {
+		const ctx = context(
+			{ java: dep({ check: { command: "java -version", pattern: "build (\\d+\\.\\d+\\.\\d+)" }, version: "21.0.12" }) },
+			{ capture: { "java -version": 'openjdk "21" (build 21.0.12+7)' }, which: { java: "/opt/java" } },
+		)
+		expect(checkCommand(ctx, "java", false)).toBe(0)
+		expect(ctx.rt.logs).toContain("java@21.0.12 (expected 21.0.12) /opt/java")
+	})
+
 	it("reports the installed version and binary path", () => {
 		const ctx = context({ go: dep() }, found)
 		expect(checkCommand(ctx, "go", false)).toBe(0)

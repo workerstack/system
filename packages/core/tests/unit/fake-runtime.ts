@@ -14,6 +14,8 @@ export interface FakeOptions {
 	platform?: NodeJS.Platform
 	/** install commands that fail; every other command succeeds */
 	failing?: string[]
+	/** check commands that time out */
+	timeouts?: string[]
 	tty?: PathSnapshot
 	/** binary token → resolved path */
 	which?: Record<string, string>
@@ -44,8 +46,9 @@ export function fakeRuntime(opts: FakeOptions = {}): FakeRuntime {
 		arch: opts.arch ?? "x64",
 		capture(command, searchPath): CaptureResult {
 			captured.push({ command, searchPath })
+			if (opts.timeouts?.includes(command)) return { ok: false, stdout: "", timedOut: true }
 			const stdout = capture[command]
-			return stdout === undefined ? { ok: false, stdout: "" } : { ok: true, stdout }
+			return stdout === undefined ? { ok: false, stdout: "", timedOut: false } : { ok: true, stdout, timedOut: false }
 		},
 		captured,
 		cwd: opts.cwd ?? "/work",

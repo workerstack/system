@@ -15,15 +15,11 @@ describe("configureEnvVars", () => {
 
 	it("writes a managed block with values, PATH entries, and a reload hint", () => {
 		const rt = fakeRuntime({ env: { SHELL: "/bin/bash" } })
-		expect(
-			configureEnvVars(rt, "go", [
-				{ key: "GOPATH", value: "$HOME/go" },
-				{ appendToPath: true, key: "PATH", value: "$HOME/go/bin" },
-			]),
-		).toBe(true)
+		expect(configureEnvVars(rt, "go", [{ key: "GOPATH", value: "$HOME/go" }, { path: "$HOME/go/bin" }])).toBe(true)
 		expect(rt.files.get(bashrc)).toContain('export GOPATH="$HOME/go"')
 		expect(rt.logs).toContain("      GOPATH=$HOME/go")
-		expect(rt.logs).toContain("      PATH+=:$HOME/go/bin")
+		expect(rt.logs).toContain("      PATH=$HOME/go/bin:$PATH")
+		expect(rt.files.get(bashrc)).toContain('export PATH="$HOME/go/bin:$PATH"')
 		expect(rt.logs).toContain("\n   Run: source ~/.bashrc   (or restart terminal)")
 	})
 
@@ -61,9 +57,12 @@ describe("configureEnvVars", () => {
 		expect(none.logs).toContain("   No environment variables to configure")
 	})
 
-	it("skips an entry with an empty value", () => {
-		const rt = fakeRuntime()
-		expect(configureEnvVars(rt, "x", [{ key: "A", value: "" }])).toBe(false)
+	it("writes a fish conf.d file for a fish SHELL", () => {
+		const rt = fakeRuntime({ env: { SHELL: "/usr/bin/fish" } })
+		configureEnvVars(rt, "go", [{ path: "$HOME/go/bin" }])
+		const fish = resolve("/home/me", ".config", "fish", "conf.d", "workerstack-system.fish")
+		expect(rt.files.get(fish)).toContain('set -gx PATH "$HOME/go/bin" $PATH')
+		expect(rt.logs).toContain(`\n   Run: source ${fish}   (or restart fish)`)
 	})
 
 	it("reports a write failure", () => {

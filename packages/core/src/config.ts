@@ -22,18 +22,16 @@ export type OsTarget = (typeof OS_TARGETS)[number]
  */
 export type OsCommands = Partial<Record<OsTarget, string | false>> & { all?: string }
 
-export interface EnvVar {
-	/** Environment variable name */
-	key: string
-	/** Value (supports $HOME and other env refs). Can be omitted if detect is provided. */
-	value?: string
-	/** If true, appends to PATH instead of setting directly */
-	appendToPath?: boolean
-	/** Auto-detect value from these paths (first existing path wins). Supports $HOME. */
-	detect?: string[]
-	/** Fallback value if detect finds nothing */
-	fallback?: string
-}
+/**
+ * One shell environment entry, written verbatim into the managed rc block (the shell expands `$HOME`).
+ * - `{ path }` puts a directory first on PATH, so the pinned binary wins over one already installed.
+ * - `{ key, value }` sets a variable.
+ * - `{ key, detect, fallback? }` sets a variable to the first `detect` path that exists, else `fallback`.
+ */
+export type EnvVar =
+	| { path: string }
+	| { key: string; value: string }
+	| { detect: string[]; fallback?: string; key: string }
 
 export interface SystemDepConfig {
 	description: string
@@ -45,7 +43,11 @@ export interface SystemDepConfig {
 	 * Version check command. Supports {{name}} template.
 	 * Default: "{{name}} --version" — only declare when it differs.
 	 */
-	check?: { command: string }
+	check?: {
+		command: string
+		/** Regex source whose first capture is the version. Default: the first `N.N…` in the output. */
+		pattern?: string
+	}
 	/** Deps that must be installed before this one (by dep key name) */
 	dependsOn?: string[]
 	/** Env vars to configure after install */
@@ -61,11 +63,6 @@ export interface SystemConfig {
 /** `{{arch}}` value: "arm64" on arm64, "amd64" everywhere else. */
 export function archLabel(arch: string = process.arch): "amd64" | "arm64" {
 	return arch === "arm64" ? "arm64" : "amd64"
-}
-
-/** Same table `check` uses. `"latest"` matches anything with a parsed version. */
-export function versionsMatch(installed: string, expected: string): boolean {
-	return expected === "latest" || installed === expected || expected.includes(installed) || installed.includes(expected)
 }
 
 /** Replace {{name}}, {{version}}, {{major}} and {{arch}} in a template. */
