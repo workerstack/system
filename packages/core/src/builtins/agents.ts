@@ -2,7 +2,7 @@
  * Agent tooling: claude, codex, grok, rtk, ffmpeg.
  */
 
-import { archive, LOCAL_BIN, localBinEnv, pick, ps, unix, winArchive } from "./recipes.ts"
+import { archive, bunGlobal, LOCAL_BIN, localBinEnv, pick, ps, unix, winArchive } from "./recipes.ts"
 import type { BuiltinDep } from "./types.ts"
 
 /** The installer's version argument: none for latest, so it takes its default channel. */
@@ -24,9 +24,10 @@ export const AGENTS = {
 		versions: "any",
 	},
 	codex: {
-		dependsOn: ["bun"],
-		description: "OpenAI Codex CLI (bun global)",
-		os: ({ version }) => ({ all: `bun i -g @openai/codex@${version}` }),
+		/* installed by bun; its launcher is a node script */
+		dependsOn: ["bun", "node"],
+		description: "OpenAI Codex CLI (bun global, runs on node)",
+		os: ({ version }) => bunGlobal("@openai/codex", version),
 		versions: "pinned",
 	},
 	ffmpeg: {

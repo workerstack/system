@@ -48,7 +48,12 @@ const defaultSh: ExecFile = (file, args) => {
 const windowsProfilePath: ExecFile = (file, args) => {
 	expect(file).toBe("powershell.exe")
 	expect([...args]).toEqual([...WINDOWS_TTY_PATH_ARGS])
-	expect(args).not.toContain("-NoProfile")
+	/* a new terminal: PATH from the registry (Machine, then User), then every profile in startup order */
+	const script = args.at(-1) as string
+	expect(script).toMatch(/^\$env:Path = \[Environment\]::GetEnvironmentVariable\('Path', 'Machine'\)/)
+	expect(script).toContain("GetEnvironmentVariable('Path', 'User')")
+	expect(script.indexOf("AllUsersAllHosts")).toBeLessThan(script.indexOf("CurrentUserCurrentHost"))
+	expect(script.trimEnd().endsWith("$env:Path")).toBe(true)
 	return "C:\\tty;C:\\Windows\r\n"
 }
 

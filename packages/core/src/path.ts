@@ -21,7 +21,24 @@ export const TTY_PATH_FALLBACK_WARN = "could not read interactive-shell PATH; us
 export const PATH_PRINTF = 'printf %s "$PATH"'
 export const UNIX_BASH_PATH_ARGS = ["-ic", PATH_PRINTF] as const
 export const UNIX_ZSH_PATH_ARGS = ["-lic", PATH_PRINTF] as const
-export const WINDOWS_TTY_PATH_ARGS = ["-NoLogo", "-NonInteractive", "-Command", "$env:Path"] as const
+/**
+ * What a new Windows terminal does: PATH from the registry (Machine, then User, where installers and
+ * choco write), then each profile in PowerShell's startup order, then print PATH. Profiles are dot-sourced
+ * explicitly (-NoProfile) because they must run after PATH is rebuilt.
+ */
+const WINDOWS_TTY_PATH_SCRIPT = [
+	"$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')",
+	"foreach ($p in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) { if (Test-Path $p) { . $p } }",
+	"$env:Path",
+].join("; ")
+
+export const WINDOWS_TTY_PATH_ARGS = [
+	"-NoLogo",
+	"-NoProfile",
+	"-NonInteractive",
+	"-Command",
+	WINDOWS_TTY_PATH_SCRIPT,
+] as const
 
 const defaultExecFile: ExecFile = (file, args, env) =>
 	execFileSync(file, [...args], {
@@ -122,7 +139,7 @@ export function parsePathOutput(out: string): string {
  * Snapshot PATH from a new interactive TTY once.
  * Unix bash: `$SHELL -ic` with stdin `/dev/null` (not login-only `-lc`).
  * Unix zsh: `$SHELL -lic` (`.zprofile` + `.zshrc`).
- * Windows: `powershell.exe` with profile (`$env:Path`), not `-NoProfile`.
+ * Windows: `powershell.exe` rebuilding PATH from the registry, then its profiles (WINDOWS_TTY_PATH_ARGS).
  * Spawn env is a keep-list (HOME/SHELL/locale/TERM) plus a stock PATH so leftover
  * parent PATH and toolchain exports cannot pin a stale binary.
  * Spawn failure or empty PATH → this process PATH (`source: "process"`).

@@ -17,6 +17,16 @@ export function unix(linux: string, macos: string): OsCommands {
 	return { "linux-apt": linux, "linux-dnf": linux, "linux-pacman": linux, macos }
 }
 
+/**
+ * A global JS CLI through bun, the only package manager. On unix bun derives its global bin dir from
+ * XDG_CACHE_HOME when set, so the dir bun's env block puts on PATH is named explicitly.
+ */
+export function bunGlobal(pkg: string, version: string): OsCommands {
+	const command = `bun i -g ${pkg}@${version}`
+	const pinned = `BUN_INSTALL_BIN="$HOME/.bun/bin" ${command}`
+	return { ...unix(pinned, pinned), windows: command }
+}
+
 /** The value for this CPU. */
 export function pick<T>(arch: Arch, values: { arm64: T; x64: T }): T {
 	return values[arch]

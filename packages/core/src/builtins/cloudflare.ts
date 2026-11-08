@@ -2,14 +2,15 @@
  * Cloudflare: the cf CLI and the cloudflared tunnel client.
  */
 
-import { archive, binary, localBinEnv, pick, unix, winBinary } from "./recipes.ts"
+import { archive, binary, bunGlobal, localBinEnv, pick, unix, winBinary } from "./recipes.ts"
 import type { BuiltinDep } from "./types.ts"
 
 export const CLOUDFLARE = {
 	cf: {
-		dependsOn: ["bun"],
-		description: "Cloudflare CLI: deploy, workers types, account operations (bun global)",
-		os: ({ version }) => ({ all: `bun i -g cf@${version}` }),
+		/* installed by bun; its launcher is a node script */
+		dependsOn: ["bun", "node"],
+		description: "Cloudflare CLI: deploy, workers types, account operations (bun global, runs on node)",
+		os: ({ version }) => bunGlobal("cf", version),
 		versions: "pinned",
 	},
 	cloudflared: {
