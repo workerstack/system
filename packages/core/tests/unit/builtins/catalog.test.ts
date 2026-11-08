@@ -130,8 +130,13 @@ describe("verified recipes", () => {
 	})
 
 	it("installs global JS CLIs with bun, never npm", () => {
-		expect(command("cf", "linux-apt", "x64", "1.0.0-beta.12")).toBe("bun i -g cf@1.0.0-beta.12")
+		/* bun's global bin follows XDG_CACHE_HOME unless pinned; the launchers are node scripts */
+		expect(command("cf", "linux-apt", "x64", "1.0.0-beta.12")).toBe(
+			'BUN_INSTALL_BIN="$HOME/.bun/bin" bun i -g cf@1.0.0-beta.12',
+		)
 		expect(command("codex", "windows", "x64", "0.160.0")).toBe("bun i -g @openai/codex@0.160.0")
+		expect(BUILTINS.cf?.dependsOn).toEqual(["bun", "node"])
+		expect(BUILTINS.codex?.dependsOn).toEqual(["bun", "node"])
 		for (const name of Object.keys(BUILTINS)) {
 			for (const os of OS_TARGETS) expect(command(name, os) ?? "").not.toMatch(/\bnpm (i|install)\b|\bpnpm\b|\byarn\b/)
 		}

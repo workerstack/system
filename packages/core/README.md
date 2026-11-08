@@ -92,7 +92,7 @@ A built-in takes only a version. The catalog supplies install commands for every
 | `jq`                 | release    | exact pin       | all                     | JSON processor.                                                                                             |
 | `pwsh`               | release    | exact pin       | all                     | PowerShell 7, for the generated Windows install scripts.                                                    |
 | `shellcheck`         | release    | exact pin       | all                     | Shell script linter, for the generated install scripts.                                                     |
-| `cf`                 | cloudflare | exact pin       | all                     | Cloudflare CLI: deploy, workers types, account operations (bun global). Needs `bun`.                        |
+| `cf`                 | cloudflare | exact pin       | all                     | Cloudflare CLI: deploy, workers types, account operations (bun global, runs on node). Needs `bun`, `node`.  |
 | `cloudflared`        | cloudflare | exact pin       | all                     | Cloudflare Tunnel client, for remote bindings.                                                              |
 | `atlas`              | database   | exact pin       | all                     | Atlas schema migrations.                                                                                    |
 | `sqld`               | database   | exact pin       | apt, dnf, pacman, macOS | libSQL server, for local database tests (no Windows build).                                                 |
@@ -101,7 +101,7 @@ A built-in takes only a version. The catalog supplies install commands for every
 | `lightpanda`         | browsers   | `latest` only   | apt, dnf, pacman, macOS | Lightpanda, the default headless browser rail (nightly; no Windows build).                                  |
 | `playwright`         | browsers   | exact pin       | all                     | Playwright's Chromium for browser tests (version = your @playwright/test). Needs `bun`.                     |
 | `claude`             | agents     | pin or `latest` | all                     | Claude Code CLI (native installer; self-updates unless DISABLE_AUTOUPDATER=1).                              |
-| `codex`              | agents     | exact pin       | all                     | OpenAI Codex CLI (bun global). Needs `bun`.                                                                 |
+| `codex`              | agents     | exact pin       | all                     | OpenAI Codex CLI (bun global, runs on node). Needs `bun`, `node`.                                           |
 | `ffmpeg`             | agents     | `latest` only   | all                     | ffmpeg, for /listen mic capture (the OS package manager's current build). Needs `brew`, `choco`.            |
 | `grok`               | agents     | pin or `latest` | all                     | Grok Build CLI by xAI (native installer).                                                                   |
 | `rtk`                | agents     | exact pin       | all                     | rtk, shell output compression behind the agent Bash hook.                                                   |
@@ -111,7 +111,7 @@ Where things land:
 - Single binaries: `$HOME/.local/bin`, or `%LOCALAPPDATA%\bin` on Windows (added to the user PATH).
 - Toolchains that need their files together (go, node, java, gradle, dotnet, pwsh): `$HOME/.local/share/<tool>`, or `%LOCALAPPDATA%\Programs\<tool>`.
 - Installers with their own home keep it: bun `~/.bun`, deno `~/.deno`, rust `~/.cargo`, grok `~/.grok`, claude and uv's Python and tools `~/.local/bin`.
-- Global JS CLIs (`cf`, `codex`) install with `bun i -g`.
+- Global JS CLIs (`cf`, `codex`) install with `bun i -g` into `~/.bun/bin`; their launchers run on `node`.
 
 Version policy, checked when the config loads:
 
