@@ -6,11 +6,11 @@ import {
 	resolveOsCommand,
 	sortByDependencies,
 	type OsTarget,
-} from "@lovrozagar/crossdeps"
-import catalog from "../../../examples/consumer/crossdeps.config.ts"
+} from "@workerstack/system"
+import catalog from "../../../examples/consumer/system.config.ts"
 import { runCli } from "./helpers.ts"
 
-const catalogPath = join(import.meta.dir, "../../../examples/consumer/crossdeps.config.ts")
+const catalogPath = join(import.meta.dir, "../../../examples/consumer/system.config.ts")
 const catalogDir = dirname(catalogPath)
 
 const NAMES = Object.keys(catalog.deps).sort()
@@ -144,7 +144,7 @@ describe("CLI dry-run of the monorepo catalog", () => {
 	test("dry-run --os windows marks dnsmasq unavailable and uses choco for git", async () => {
 		const result = await runCli(["install", "--dry-run", "--os", "windows", "--config", catalogPath], {
 			cwd: catalogDir,
-			env: { CROSSDEPS_OS: undefined },
+			env: { WORKERSTACK_SYSTEM_OS: undefined },
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("dnsmasq@2.92 — not available on windows")
@@ -156,7 +156,7 @@ describe("CLI dry-run of the monorepo catalog", () => {
 	test("dry-run --os macos uses brew and darwin node tarball", async () => {
 		const result = await runCli(["install", "--dry-run", "--os", "macos", "--config", catalogPath], {
 			cwd: catalogDir,
-			env: { CROSSDEPS_OS: undefined },
+			env: { WORKERSTACK_SYSTEM_OS: undefined },
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("brew install git")
@@ -168,7 +168,7 @@ describe("CLI dry-run of the monorepo catalog", () => {
 		for (const os of ["linux-apt", "linux-dnf", "linux-pacman"] as const) {
 			const result = await runCli(["install", "--dry-run", "--os", os, "--config", catalogPath], {
 				cwd: catalogDir,
-				env: { CROSSDEPS_OS: undefined },
+				env: { WORKERSTACK_SYSTEM_OS: undefined },
 			})
 			expect(result.exitCode).toBe(0)
 			expect(result.stdout).toContain(`Detected OS: ${os}`)

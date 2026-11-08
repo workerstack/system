@@ -52,7 +52,7 @@ export interface SystemDepConfig {
 	env?: EnvVar[]
 }
 
-export interface CrossdepsConfig {
+export interface SystemConfig {
 	/** Path to package.json for packageManager sync. Relative to config file directory. */
 	packageJsonPath?: string
 	deps: Record<string, SystemDepConfig>
@@ -112,7 +112,7 @@ export function resolveCheckCommand(name: string, config: SystemDepConfig): stri
 export function defineConfig(options: {
 	packageJsonPath?: string
 	deps: Record<string, SystemDepConfig>
-}): CrossdepsConfig {
+}): SystemConfig {
 	return {
 		deps: options.deps,
 		packageJsonPath: options.packageJsonPath ?? "package.json",

@@ -221,7 +221,7 @@ describe("snapshotTtyPath", () => {
 
 	it("TTY spawn env has no parent PATH or leftover toolchain exports", () => {
 		if (process.platform === "win32") return
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-tty-isolate-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-tty-isolate-"))
 		const shell = join(dir, "shell")
 		writeFileSync(
 			shell,
@@ -301,7 +301,7 @@ describe("snapshotTtyPath", () => {
 	it("takes PATH from bash interactive rc, not login-only files", () => {
 		if (process.platform === "win32") return
 		const bash = existsSync("/bin/bash") ? "/bin/bash" : "bash"
-		const home = mkdtempSync(join(tmpdir(), "crossdeps-tty-bash-"))
+		const home = mkdtempSync(join(tmpdir(), "system-tty-bash-"))
 		const interactiveDir = join(home, "interactive-bin")
 		const loginDir = join(home, "login-bin")
 		const poisonDir = join(home, "poison-bin")
@@ -329,7 +329,7 @@ describe("snapshotTtyPath", () => {
 
 	it("does not treat stdin as a TTY", () => {
 		if (process.platform === "win32") return
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-tty-stdin-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-tty-stdin-"))
 		const shell = join(dir, "shell")
 		writeFileSync(
 			shell,

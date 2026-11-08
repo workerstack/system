@@ -1,4 +1,4 @@
-import { defineConfig } from "@lovrozagar/crossdeps"
+import { defineConfig } from "@workerstack/system"
 
 /**
  * Fixture config for consumer tests. Commands are bun no-ops so they
@@ -8,7 +8,7 @@ export default defineConfig({
 	packageJsonPath: "package.json",
 	deps: {
 		absent: {
-			check: { command: "crossdeps-definitely-missing --version" },
+			check: { command: "system-definitely-missing --version" },
 			description: "Optional dep that is not installed",
 			os: { all: "bun -e \"console.log('installed-absent')\"" },
 			required: false,

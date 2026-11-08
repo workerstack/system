@@ -53,7 +53,7 @@ describe("renderEnvBlock", () => {
 
 	it("emits bash exports", () => {
 		const block = renderEnvBlock("tool", envs, "posix")
-		expect(block).toContain("# tool environment (managed by crossdeps)")
+		expect(block).toContain("# tool environment (managed by @workerstack/system)")
 		expect(block).toContain('export TOOL_HOME="$HOME/tool"')
 		expect(block).toContain('export PATH="$PATH:$HOME/tool/bin"')
 		expect(block).toContain("# end tool environment")
@@ -76,6 +76,17 @@ describe("applyEnvBlock", () => {
 		expect(next).toContain("keep")
 		expect(next).toContain('export A="2"')
 		expect(next).not.toContain('export A="1"')
+	})
+
+	it("replaces a legacy crossdeps block with one new block", () => {
+		const legacy = '\n# tool environment (managed by crossdeps)\nexport A="old"\n# end tool environment\n'
+		const block = renderEnvBlock("tool", [{ key: "A", value: "new" }], "posix")
+		const next = applyEnvBlock(`before\n${legacy}after\n`, block, "tool")
+		expect(next).toContain("before\n")
+		expect(next).toContain("after\n")
+		expect(next).not.toContain("managed by crossdeps")
+		expect(next).not.toContain('export A="old"')
+		expect(next.match(/managed by @workerstack\/system/g)).toHaveLength(1)
 	})
 })
 

@@ -7,8 +7,8 @@ import {
 	sortByDependencies,
 	versionsMatch,
 	whichBinary,
-} from "@lovrozagar/crossdeps"
-import config from "../crossdeps.config.ts"
+} from "@workerstack/system"
+import config from "../system.config.ts"
 
 export { config }
 

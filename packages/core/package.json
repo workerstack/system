@@ -1,7 +1,7 @@
 {
-	"name": "@lovrozagar/crossdeps",
+	"name": "@workerstack/system",
 	"version": "0.2.3",
-	"description": "Cross-platform system dependency manager. Define deps in a config file, run crossdeps install.",
+	"description": "Every OS dependency workerstack needs, installed by one command. Define deps in system.config.ts, run system install.",
 	"keywords": [
 		"cli",
 		"cross-platform",
@@ -9,17 +9,18 @@
 		"installer",
 		"system"
 	],
-	"homepage": "https://github.com/lovrozagar/crossdeps#readme",
+	"homepage": "https://github.com/workerstack/system#readme",
 	"bugs": {
-		"url": "https://github.com/lovrozagar/crossdeps/issues"
+		"url": "https://github.com/workerstack/system/issues"
 	},
 	"license": "MIT",
+	"author": "workerstack",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/lovrozagar/crossdeps.git"
+		"url": "git+https://github.com/workerstack/system.git"
 	},
 	"bin": {
-		"crossdeps": "./src/cli.ts"
+		"system": "./src/cli.ts"
 	},
 	"files": [
 		"src"

@@ -6,12 +6,12 @@
  */
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { sortByDependencies } from "@lovrozagar/crossdeps"
-import catalog from "../examples/consumer/crossdeps.config.ts"
+import { sortByDependencies } from "@workerstack/system"
+import catalog from "../examples/consumer/system.config.ts"
 
 const cli = join(import.meta.dir, "../packages/core/src/cli.ts")
-const configPath = join(import.meta.dir, "../examples/consumer/crossdeps.config.ts")
-const perDepMs = Number(process.env.CROSSDEPS_INSTALL_TIMEOUT_MS ?? 180_000)
+const configPath = join(import.meta.dir, "../examples/consumer/system.config.ts")
+const perDepMs = Number(process.env.WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS ?? 180_000)
 
 type Outcome = "ok" | "failed" | "timeout"
 

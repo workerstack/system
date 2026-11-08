@@ -69,7 +69,7 @@ jobs:
       - run: bun run test
       - run: bun run test:consumers
         env:
-          CROSSDEPS_REAL_INSTALL: "1"
+          WORKERSTACK_SYSTEM_REAL_INSTALL: "1"
 
   docker:
     name: docker e2e
@@ -103,4 +103,4 @@ jobs:
       - name: Install the example catalog
         run: bun e2e/catalog-install.ts
         env:
-          CROSSDEPS_INSTALL_TIMEOUT_MS: "600000"
+          WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS: "600000"

@@ -1,25 +1,26 @@
 #!/usr/bin/env bun
 /**
- * crossdeps CLI — cross-platform system dependency manager.
+ * @workerstack/system CLI — cross-platform system dependency manager.
  *
  * Usage:
- *   crossdeps install              Install all deps (auto-detect OS, respects depends order)
- *   crossdeps install <name>       Install single dep
- *   crossdeps check                Check all deps
- *   crossdeps check <name>         Check single dep
- *   crossdeps env                  Setup environment variables
- *   crossdeps sync-pm              Sync packageManager field
+ *   system install              Install all deps (auto-detect OS, respects depends order)
+ *   system install <name>       Install single dep
+ *   system check                Check all deps
+ *   system check <name>         Check single dep
+ *   system env                  Setup environment variables
+ *   system sync-pm              Sync packageManager field
  */
 
 import { execSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, resolve } from "node:path"
-import type { CrossdepsConfig, EnvVar, OsTarget, SystemDepConfig } from "./config.ts"
+import type { SystemConfig, EnvVar, OsTarget, SystemDepConfig } from "./config.ts"
 import { resolveCheckCommand, resolveOsCommand, versionsMatch } from "./config.ts"
 import {
 	applyEnvBlock,
 	ensureParentDir,
+	hasEnvBlock,
 	expandPath,
 	reloadHint,
 	renderEnvBlock,
@@ -31,9 +32,9 @@ import { runShellCommand } from "./exec.ts"
 import { TTY_PATH_FALLBACK_WARN, pathEnv, processPath, snapshotTtyPath } from "./path.ts"
 import { commandExists, detectOs, parseOsTarget, whichBinary } from "./platform.ts"
 
-const CONFIG_NAMES = ["crossdeps.config.ts", "crossdeps.config.js", "crossdeps.config.mjs"]
+const CONFIG_NAMES = ["system.config.ts", "system.config.js", "system.config.mjs"]
 
-const USAGE = `Usage: crossdeps <command> [args]
+const USAGE = `Usage: system <command> [args]
 
 Commands:
   install              Install all deps (auto-detect OS)
@@ -44,8 +45,8 @@ Commands:
   sync-pm              Sync packageManager field in package.json
 
 Flags:
-  --config <path>      Config file (default: crossdeps.config.ts in cwd)
-  --os <target>        Force OS target (or set CROSSDEPS_OS)
+  --config <path>      Config file (default: system.config.ts in cwd)
+  --os <target>        Force OS target (or set WORKERSTACK_SYSTEM_OS)
   --dry-run            Print install commands without running them
   --upgrade            Re-run install when the detected version does not match
   --here               check: use this process PATH instead of an interactive-shell snapshot
@@ -75,7 +76,7 @@ function resolveConfigPath(args: string[]): string {
 		if (existsSync(candidate)) return candidate
 	}
 
-	console.error(`No crossdeps config found. Create one of: ${CONFIG_NAMES.join(", ")}`)
+	console.error(`No system config found. Create one of: ${CONFIG_NAMES.join(", ")}`)
 	process.exit(1)
 }
 
@@ -97,18 +98,18 @@ function stripBoolFlag(args: string[], flag: string): { args: string[]; present:
 	return { args: [...args.slice(0, idx), ...args.slice(idx + 1)], present: true }
 }
 
-async function loadConfig(configPath: string): Promise<CrossdepsConfig> {
+async function loadConfig(configPath: string): Promise<SystemConfig> {
 	const mod = (await import(configPath)) as Record<string, unknown>
 
 	/* support: export default defineConfig(...) */
 	if (mod.default && typeof mod.default === "object" && "deps" in (mod.default as Record<string, unknown>)) {
-		return mod.default as CrossdepsConfig
+		return mod.default as SystemConfig
 	}
 
 	/* support: export const config = defineConfig(...) */
 	for (const value of Object.values(mod)) {
 		if (value && typeof value === "object" && "deps" in (value as Record<string, unknown>)) {
-			return value as CrossdepsConfig
+			return value as SystemConfig
 		}
 	}
 
@@ -206,7 +207,7 @@ function configureEnvVars(tool: string, envVars: EnvVar[]): boolean {
 			return false
 		}
 
-		if (existingContent.includes(`# ${tool} environment (managed by crossdeps)`)) {
+		if (hasEnvBlock(existingContent, tool)) {
 			console.log(`   Updating existing ${tool} environment config...`)
 		}
 
@@ -261,7 +262,7 @@ function installOne(
 		console.log(
 			`   Already installed (${installed}), skipping (expected ${config.version})${binaryPathNote(name, config)}`,
 		)
-		console.log(`   run: crossdeps install ${name} --upgrade`)
+		console.log(`   run: system install ${name} --upgrade`)
 		return "skipped"
 	}
 
@@ -305,7 +306,7 @@ function cmdInstall(
 		return
 	}
 
-	console.log("crossdeps — System Dependencies Installer")
+	console.log("@workerstack/system — install")
 	console.log(`Detected OS: ${os}`)
 	console.log("=".repeat(50))
 
@@ -393,7 +394,7 @@ function cmdCheck(
 		return
 	}
 
-	console.log("crossdeps — System Dependencies Check")
+	console.log("@workerstack/system — check")
 	console.log(`Detected OS: ${os}`)
 	console.log("=".repeat(50))
 
@@ -455,12 +456,12 @@ function cmdCheck(
 	console.log(`OK: ${ok}  Mismatch: ${warn}  Missing: ${missing}`)
 
 	if (missing > 0) {
-		console.log("\nRequired dependencies missing — run: crossdeps install")
+		console.log("\nRequired dependencies missing — run: system install")
 		process.exit(1)
 	}
 
 	if (warn > 0) {
-		console.log("\nVersion mismatches found — run: crossdeps install --upgrade")
+		console.log("\nVersion mismatches found — run: system install --upgrade")
 	} else {
 		console.log("\nAll system dependencies OK")
 	}
@@ -541,7 +542,7 @@ async function main(): Promise<void> {
 	}
 	if (osFlag.value) {
 		try {
-			process.env.CROSSDEPS_OS = parseOsTarget(osFlag.value)
+			process.env.WORKERSTACK_SYSTEM_OS = parseOsTarget(osFlag.value)
 		} catch (error) {
 			console.error(error instanceof Error ? error.message : error)
 			process.exit(1)

@@ -24,11 +24,26 @@ export function expandPath(path: string, home: string, env: NodeJS.ProcessEnv = 
 		.replace(/%ANDROID_HOME%/gi, env.ANDROID_HOME || "")
 }
 
-export function envMarkers(tool: string): { end: string; start: string } {
+export const MARKER_OWNER = "@workerstack/system"
+
+/** Owner tag written before the rename; blocks carrying it are replaced, never duplicated. */
+export const LEGACY_MARKER_OWNER = "crossdeps"
+
+export function envMarkers(tool: string, owner: string = MARKER_OWNER): { end: string; start: string } {
 	return {
 		end: `# end ${tool} environment`,
-		start: `# ${tool} environment (managed by crossdeps)`,
+		start: `# ${tool} environment (managed by ${owner})`,
 	}
+}
+
+function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function stripBlock(existing: string, tool: string, owner: string): string {
+	const { end, start } = envMarkers(tool, owner)
+	if (!existing.includes(start)) return existing
+	return existing.replace(new RegExp(`\\r?\\n?${escapeRegExp(start)}[\\s\\S]*?${escapeRegExp(end)}\\r?\\n?`, "g"), "")
 }
 
 export function renderEnvBlock(
@@ -51,13 +66,13 @@ export function renderEnvBlock(
 }
 
 export function applyEnvBlock(existing: string, block: string, tool: string): string {
-	const { end, start } = envMarkers(tool)
-	const escapedStart = start.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-	const escapedEnd = end.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-	const cleaned = existing.includes(start)
-		? existing.replace(new RegExp(`\\r?\\n?${escapedStart}[\\s\\S]*?${escapedEnd}\\r?\\n?`, "g"), "")
-		: existing
-	return cleaned + block
+	const withoutLegacy = stripBlock(existing, tool, LEGACY_MARKER_OWNER)
+	return stripBlock(withoutLegacy, tool, MARKER_OWNER) + block
+}
+
+/** True when the rc already holds a block for `tool`, current or legacy. */
+export function hasEnvBlock(existing: string, tool: string): boolean {
+	return existing.includes(envMarkers(tool).start) || existing.includes(envMarkers(tool, LEGACY_MARKER_OWNER).start)
 }
 
 export function ensureParentDir(filePath: string): void {
