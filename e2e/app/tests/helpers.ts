@@ -1,4 +1,4 @@
-const cli = `${import.meta.dir}/../../../packages/core/src/cli.ts`
+const cli = `${import.meta.dir}/../../../packages/core/src/bin.ts`
 
 export async function runCli(
 	args: string[],

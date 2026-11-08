@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import type { SystemDepConfig } from "../../src/config.ts"
+import { ConfigError } from "../../src/errors.ts"
 import { sortByDependencies } from "../../src/graph.ts"
 
 function dep(overrides: Partial<SystemDepConfig> = {}): SystemDepConfig {
@@ -12,37 +13,47 @@ function dep(overrides: Partial<SystemDepConfig> = {}): SystemDepConfig {
 	}
 }
 
+const names = (entries: Array<[string, SystemDepConfig]>) => sortByDependencies(entries).map(([name]) => name)
+
 describe("sortByDependencies", () => {
 	it("puts dependsOn targets first", () => {
-		const sorted = sortByDependencies([
-			["npm", dep({ dependsOn: ["node"] })],
-			["node", dep()],
-		])
-		expect(sorted.map(([name]) => name)).toEqual(["node", "npm"])
+		expect(
+			names([
+				["cf", dep({ dependsOn: ["bun"] })],
+				["bun", dep()],
+			]),
+		).toEqual(["bun", "cf"])
 	})
 
-	it("walks a deeper chain", () => {
-		const sorted = sortByDependencies([
-			["cli", dep({ dependsOn: ["npm"] })],
-			["npm", dep({ dependsOn: ["node"] })],
-			["node", dep()],
-		])
-		expect(sorted.map(([name]) => name)).toEqual(["node", "npm", "cli"])
+	it("walks a deeper chain and keeps independent entries in config order", () => {
+		expect(
+			names([
+				["z", dep()],
+				["ruff", dep({ dependsOn: ["uv"] })],
+				["uv", dep({ dependsOn: ["curl"] })],
+				["curl", dep()],
+				["mypy", dep({ dependsOn: ["uv"] })],
+			]),
+		).toEqual(["z", "curl", "uv", "ruff", "mypy"])
 	})
 
-	it("ignores dependsOn names that are not in the set", () => {
-		const sorted = sortByDependencies([["agent-browser", dep({ dependsOn: ["rust"] })]])
-		expect(sorted.map(([name]) => name)).toEqual(["agent-browser"])
+	it("throws on a dependsOn name that is not in the config", () => {
+		expect(() => names([["ruff", dep({ dependsOn: ["uv"] })]])).toThrow(
+			new ConfigError('deps.ruff.dependsOn: "uv" is not a dep in this config'),
+		)
 	})
 
-	it("breaks cycles without duplicating entries", () => {
-		const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
-		const sorted = sortByDependencies([
-			["a", dep({ dependsOn: ["b"] })],
-			["b", dep({ dependsOn: ["a"] })],
-		])
-		expect(sorted.map(([name]) => name).sort()).toEqual(["a", "b"])
-		expect(warn).toHaveBeenCalled()
-		warn.mockRestore()
+	it("throws on a cycle and names it", () => {
+		expect(() =>
+			names([
+				["a", dep({ dependsOn: ["b"] })],
+				["b", dep({ dependsOn: ["c"] })],
+				["c", dep({ dependsOn: ["a"] })],
+			]),
+		).toThrow(new ConfigError("dependency cycle: a → b → c → a"))
+	})
+
+	it("throws on a self-dependency", () => {
+		expect(() => names([["a", dep({ dependsOn: ["a"] })]])).toThrow(new ConfigError("dependency cycle: a → a"))
 	})
 })

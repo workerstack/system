@@ -6,7 +6,7 @@ import { OS_TARGETS } from "../../src/config.ts"
 import { processPath } from "../../src/path.ts"
 import {
 	commandExists,
-	commandLookup,
+	detectLinuxDistro,
 	detectOs,
 	detectOsFromPlatform,
 	parseOsTarget,
@@ -121,10 +121,36 @@ describe("commandExists with search PATH", () => {
 	})
 })
 
-describe("commandLookup", () => {
-	it("uses where.exe on Windows and command -v elsewhere", () => {
-		expect(commandLookup("bun", "win32")).toBe("where bun >nul 2>&1")
-		expect(commandLookup("bun", "darwin")).toBe("command -v bun >/dev/null 2>&1")
-		expect(commandLookup("bun", "linux")).toBe("command -v bun >/dev/null 2>&1")
+describe("whichBinary lookup", () => {
+	it("asks where on Windows and command -v elsewhere, with the replaced PATH", () => {
+		const calls: Array<[string, NodeJS.ProcessEnv | undefined]> = []
+		const exec = (command: string, env: NodeJS.ProcessEnv | undefined) => {
+			calls.push([command, env])
+			return "C:\\a\\bun.exe\r\nC:\\b\\bun.exe\r\n"
+		}
+		expect(whichBinary("bun", "win32", "C:\\bin", exec)).toBe("C:\\a\\bun.exe")
+		expect(whichBinary("bun", "linux", undefined, exec)).toBe("C:\\a\\bun.exe")
+		expect(calls[0]?.[0]).toBe("where bun")
+		expect(calls[0]?.[1]?.PATH).toBe("C:\\bin")
+		expect(calls[1]).toEqual(["command -v bun", undefined])
+	})
+
+	it("treats empty output or a failed lookup as missing", () => {
+		expect(whichBinary("bun", "linux", undefined, () => "  \n")).toBeNull()
+		expect(
+			whichBinary("bun", "linux", undefined, () => {
+				throw new Error("exit 1")
+			}),
+		).toBeNull()
+	})
+})
+
+describe("detectLinuxDistro", () => {
+	it("prefers apt, then dnf, then pacman, else defaults to apt", () => {
+		expect(detectLinuxDistro((c) => c === "apt-get" || c === "dnf")).toBe("linux-apt")
+		expect(detectLinuxDistro((c) => c === "dnf")).toBe("linux-dnf")
+		expect(detectLinuxDistro((c) => c === "pacman")).toBe("linux-pacman")
+		expect(detectLinuxDistro(() => false)).toBe("linux-apt")
+		expect(detectOsFromPlatform("linux", undefined, (c) => c === "pacman")).toBe("linux-pacman")
 	})
 })

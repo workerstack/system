@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 import type { SystemDepConfig } from "../../src/config.ts"
-import { defineConfig, interpolate, resolveCheckCommand, resolveOsCommand, versionsMatch } from "../../src/config.ts"
+import {
+	archLabel,
+	defineConfig,
+	interpolate,
+	resolveCheckCommand,
+	resolveOsCommand,
+	versionsMatch,
+} from "../../src/config.ts"
 
 function dep(overrides: Partial<SystemDepConfig> = {}): SystemDepConfig {
 	return {
@@ -17,9 +24,10 @@ describe("interpolate", () => {
 		expect(interpolate("{{name}}@{{version}} ({{major}})", "node", "22.12.0")).toBe("node@22.12.0 (22)")
 	})
 
-	it("replaces arch with a known value", () => {
-		const result = interpolate("bin-{{arch}}", "jq", "1.8.1")
-		expect(result === "bin-arm64" || result === "bin-amd64").toBe(true)
+	it("maps arm64 to arm64 and every other arch to amd64", () => {
+		expect(interpolate("bin-{{arch}}", "jq", "1.8.1", "arm64")).toBe("bin-arm64")
+		expect(interpolate("bin-{{arch}}", "jq", "1.8.1", "x64")).toBe("bin-amd64")
+		expect(archLabel()).toBe(process.arch === "arm64" ? "arm64" : "amd64")
 	})
 
 	it("uses the full version as major when there is no dot", () => {
@@ -28,6 +36,10 @@ describe("interpolate", () => {
 })
 
 describe("resolveOsCommand", () => {
+	it("returns null when neither the OS key nor all is set", () => {
+		expect(resolveOsCommand("git", dep({ os: { macos: "brew install git" } }), "linux-apt")).toBeNull()
+	})
+
 	it("uses the specific OS command over all", () => {
 		const command = resolveOsCommand(
 			"git",

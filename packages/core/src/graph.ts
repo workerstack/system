@@ -1,45 +1,33 @@
 import type { SystemDepConfig } from "./config.ts"
+import { ConfigError } from "./errors.ts"
 
 /**
- * Topological sort of deps respecting `dependsOn` field.
- * Returns dep names in install order.
+ * Install order: every `dependsOn` target before its dependent, otherwise config order.
+ * Throws `ConfigError` on a `dependsOn` name missing from the config, or on a cycle.
  */
-export function sortByDependencies(depEntries: Array<[string, SystemDepConfig]>): Array<[string, SystemDepConfig]> {
-	const nameSet = new Set(depEntries.map(([name]) => name))
-	const sorted: Array<[string, SystemDepConfig]> = []
-	const visited = new Set<string>()
-	const visiting = new Set<string>()
+export function sortByDependencies<T extends Pick<SystemDepConfig, "dependsOn">>(
+	entries: Array<[string, T]>,
+): Array<[string, T]> {
+	const byName = new Map(entries)
+	const sorted: Array<[string, T]> = []
+	const done = new Set<string>()
+	const path: string[] = []
 
-	const depMap = new Map(depEntries)
-
-	function visit(name: string): void {
-		if (visited.has(name)) return
-		if (visiting.has(name)) {
-			console.warn(`Circular dependency detected involving: ${name}`)
-			return
+	function visit(name: string, config: T): void {
+		if (done.has(name)) return
+		const start = path.indexOf(name)
+		if (start !== -1) throw new ConfigError(`dependency cycle: ${[...path.slice(start), name].join(" → ")}`)
+		path.push(name)
+		for (const dep of config.dependsOn ?? []) {
+			const target = byName.get(dep)
+			if (target === undefined) throw new ConfigError(`deps.${name}.dependsOn: "${dep}" is not a dep in this config`)
+			visit(dep, target)
 		}
-
-		visiting.add(name)
-
-		const config = depMap.get(name)
-		if (config?.dependsOn) {
-			for (const dep of config.dependsOn) {
-				if (nameSet.has(dep)) {
-					visit(dep)
-				}
-			}
-		}
-
-		visiting.delete(name)
-		visited.add(name)
-		if (config) {
-			sorted.push([name, config])
-		}
+		path.pop()
+		done.add(name)
+		sorted.push([name, config])
 	}
 
-	for (const [name] of depEntries) {
-		visit(name)
-	}
-
+	for (const [name, config] of entries) visit(name, config)
 	return sorted
 }
