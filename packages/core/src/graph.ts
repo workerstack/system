@@ -5,7 +5,7 @@ import { ConfigError } from "./errors.ts"
  * Install order: every `dependsOn` target before its dependent, otherwise config order.
  * Throws `ConfigError` on a `dependsOn` name missing from the config, or on a cycle.
  */
-export function sortByDependencies<T extends Pick<SystemDepConfig, "dependsOn">>(
+export function sortByDependencies<T extends Pick<SystemDepConfig, "dependsOn" | "version">>(
 	entries: Array<[string, T]>,
 ): Array<[string, T]> {
 	const byName = new Map(entries)

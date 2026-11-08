@@ -1,11 +1,15 @@
 import { dirname, join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import {
+	BUILTIN_NAMES,
+	BUILTINS,
 	OS_TARGETS,
-	resolveCheckCommand,
-	resolveOsCommand,
-	sortByDependencies,
 	type OsTarget,
+	resolveCheckCommand,
+	resolveDeps,
+	resolveOsCommand,
+	type SystemDepConfig,
+	sortByDependencies,
 } from "@workerstack/system"
 import catalog from "../../../examples/consumer/system.config.ts"
 import { runCli } from "./helpers.ts"
@@ -13,167 +17,109 @@ import { runCli } from "./helpers.ts"
 const catalogPath = join(import.meta.dir, "../../../examples/consumer/system.config.ts")
 const catalogDir = dirname(catalogPath)
 
-const NAMES = Object.keys(catalog.deps).sort()
-
-function availableOn(name: string, os: OsTarget): boolean {
-	return resolveOsCommand(name, catalog.deps[name]!, os) !== null
+function resolvedOn(os: OsTarget, arch = "x64"): Record<string, SystemDepConfig> {
+	return resolveDeps(catalog.deps, { arch, os }, BUILTINS)
 }
 
-describe("monorepo catalog — every dep and command", () => {
-	test("loads the full 24-dep catalog", () => {
-		expect(NAMES).toEqual([
-			"agent-browser",
-			"android-sdk",
-			"android-studio",
-			"atlas",
-			"bun",
-			"claude",
-			"cloudflared",
-			"deno",
-			"dnsmasq",
-			"docker",
-			"epiphany",
-			"firefox",
-			"flux",
-			"foundry",
-			"git",
-			"google-chrome",
-			"jq",
-			"nginx",
-			"node",
-			"npm",
-			"playwright-deps",
-			"rust",
-			"stripe-cli",
-			"tauri-deps",
-		])
+describe("workerstack catalog — every built-in and the custom form", () => {
+	test("declares every built-in except the auto-added bootstraps, plus one custom dep", () => {
+		const declared = Object.keys(catalog.deps)
+		const builtins = declared.filter((name) => BUILTIN_NAMES.has(name))
+		expect(builtins.length).toBe(BUILTIN_NAMES.size - 2)
+		expect(declared.filter((name) => !BUILTIN_NAMES.has(name))).toEqual(["stripe-cli"])
 	})
 
-	test("every resolved install command is interpolated", () => {
-		const resolved: Array<{ cmd: string; name: string; os: OsTarget }> = []
-		for (const name of NAMES) {
-			const dep = catalog.deps[name]!
-			for (const os of OS_TARGETS) {
-				const cmd = resolveOsCommand(name, dep, os)
-				if (cmd) resolved.push({ cmd, name, os })
+	test("resolves to 37 deps with brew and choco added", () => {
+		const deps = resolvedOn("linux-apt")
+		expect(Object.keys(deps).length).toBe(37)
+		expect(deps.brew?.version).toBe("latest")
+		expect(deps.choco?.version).toBe("latest")
+	})
+
+	test("every resolved command on every OS and CPU is interpolated", () => {
+		let count = 0
+		for (const os of OS_TARGETS) {
+			for (const arch of ["x64", "arm64"]) {
+				for (const [name, dep] of Object.entries(resolvedOn(os, arch))) {
+					const cmd = resolveOsCommand(name, dep, os)
+					if (!cmd) continue
+					count++
+					expect(cmd, `${name} on ${os}/${arch}`).not.toContain("{{")
+				}
 			}
 		}
-		expect(resolved.length).toBeGreaterThan(80)
-		for (const { cmd, name, os } of resolved) {
-			expect(cmd, `${name} on ${os}`).not.toContain("{{")
-			expect(cmd.trim().length).toBeGreaterThan(0)
+		expect(count).toBeGreaterThan(300)
+	})
+
+	test("dependsOn puts prerequisites first", () => {
+		const order = sortByDependencies(Object.entries(resolvedOn("macos"))).map(([name]) => name)
+		const before = (a: string, b: string) => expect(order.indexOf(a), `${a} before ${b}`).toBeLessThan(order.indexOf(b))
+		for (const dep of ["ruff", "mypy", "python"]) before("uv", dep)
+		for (const dep of ["gradle", "google-java-format"]) before("java", dep)
+		for (const dep of ["cf", "codex", "playwright"]) before("bun", dep)
+		for (const dep of ["git", "curl", "docker", "ffmpeg"]) before("brew", dep)
+	})
+
+	test("the atlas override keeps the catalog's commands and replaces the description", () => {
+		const atlas = resolvedOn("linux-apt").atlas!
+		expect(atlas.description).toStartWith("Atlas: after an upgrade")
+		expect(resolveOsCommand("atlas", atlas, "linux-apt")).toContain("atlas-linux-amd64-v1.3.0")
+	})
+
+	test("check commands come from the catalog or default to name --version", () => {
+		const deps = resolvedOn("linux-apt")
+		expect(resolveCheckCommand("go", deps.go!)).toBe("go version")
+		expect(resolveCheckCommand("java", deps.java!)).toBe("java -version 2>&1")
+		expect(resolveCheckCommand("uv", deps.uv!)).toBe("uv --version")
+		expect(resolveCheckCommand("stripe-cli", deps["stripe-cli"]!)).toBe("stripe version")
+	})
+
+	test("windows commands never use apt or brew, macOS never apt or choco", () => {
+		for (const [name, dep] of Object.entries(resolvedOn("windows"))) {
+			const cmd = resolveOsCommand(name, dep, "windows") ?? ""
+			expect(cmd, name).not.toMatch(/apt-get|brew install/)
 		}
-	})
-
-	test("check commands interpolate or default to name --version", () => {
-		expect(resolveCheckCommand("adb-missing", catalog.deps["android-sdk"]!)).toBe("adb --version")
-		expect(resolveCheckCommand("node", catalog.deps.node!)).toBe("node --version")
-		expect(resolveCheckCommand("atlas", catalog.deps.atlas!)).toBe("atlas version")
-		expect(resolveCheckCommand("nginx", catalog.deps.nginx!)).toBe("nginx -v 2>&1")
-		expect(resolveCheckCommand("stripe-cli", catalog.deps["stripe-cli"]!)).toBe("stripe version")
-	})
-
-	test("dependsOn is honored in install order", () => {
-		const order = sortByDependencies(Object.entries(catalog.deps)).map(([name]) => name)
-		expect(order.indexOf("rust")).toBeLessThan(order.indexOf("agent-browser"))
-		expect(order.indexOf("rust")).toBeLessThan(order.indexOf("tauri-deps"))
-		expect(order.indexOf("android-sdk")).toBeLessThan(order.indexOf("android-studio"))
-		expect(order.indexOf("node")).toBeLessThan(order.indexOf("npm"))
-		expect(order.indexOf("npm")).toBeLessThan(order.indexOf("claude"))
-	})
-
-	test("env blocks exist on android-sdk, deno, and rust", () => {
-		expect(catalog.deps["android-sdk"]?.env?.some((e) => e.key === "ANDROID_HOME")).toBe(true)
-		expect(catalog.deps.deno?.env?.some((e) => e.key === "DENO_INSTALL")).toBe(true)
-		expect(catalog.deps.rust?.env?.some((e) => e.key === "CARGO_HOME")).toBe(true)
-	})
-
-	test("unavailable combinations match the monorepo catalog", () => {
-		const missing: Record<string, OsTarget[]> = {
-			"android-sdk": ["linux-dnf", "linux-pacman", "windows"],
-			"android-studio": ["linux-dnf", "linux-pacman", "windows"],
-			dnsmasq: ["windows"],
-			epiphany: ["macos", "windows"],
-			flux: ["linux-apt", "linux-dnf", "linux-pacman"],
-			foundry: ["windows"],
-			"google-chrome": ["linux-pacman"],
-			"playwright-deps": ["windows"],
-		}
-		for (const [name, oss] of Object.entries(missing)) {
-			for (const os of oss) {
-				expect(availableOn(name, os), `${name} should be unavailable on ${os}`).toBe(false)
-			}
-		}
-		expect(availableOn("dnsmasq", "linux-apt")).toBe(true)
-		expect(availableOn("tauri-deps", "windows")).toBe(true)
-		expect(availableOn("bun", "windows")).toBe(true)
-	})
-
-	test("windows commands use choco or powershell, not apt/brew", () => {
-		for (const name of NAMES) {
-			const cmd = resolveOsCommand(name, catalog.deps[name]!, "windows")
-			if (!cmd) continue
-			expect(cmd, name).not.toContain("apt-get")
-			expect(cmd, name).not.toContain("brew install")
-		}
-	})
-
-	test("macos commands do not use apt or choco", () => {
-		for (const name of NAMES) {
-			const cmd = resolveOsCommand(name, catalog.deps[name]!, "macos")
-			if (!cmd) continue
-			expect(cmd, name).not.toContain("apt-get")
-			expect(cmd, name).not.toContain("choco install")
+		for (const [name, dep] of Object.entries(resolvedOn("macos"))) {
+			const cmd = resolveOsCommand(name, dep, "macos") ?? ""
+			expect(cmd, name).not.toMatch(/apt-get|choco install/)
 		}
 	})
 })
 
-describe("CLI dry-run of the monorepo catalog", () => {
-	test("prints every dep command for the native OS", async () => {
-		const result = await runCli(["install", "--dry-run", "--config", catalogPath], {
-			cwd: catalogDir,
-		})
+describe("CLI dry-run of the workerstack catalog", () => {
+	test("prints every dep for the native OS", async () => {
+		const result = await runCli(["install", "--dry-run", "--config", catalogPath], { cwd: catalogDir })
 		expect(result.exitCode).toBe(0)
-		expect(result.stdout).toContain("Dry-run")
-		expect(result.stdout).toContain("Found 24 dependencies")
-		for (const name of NAMES) {
-			expect(result.stdout).toContain(`${name}@`)
-		}
+		expect(result.stdout).toContain("Dry-run complete")
+		expect(result.stdout).toContain("Found 37 dependencies")
 	})
 
-	test("dry-run --os windows marks dnsmasq unavailable and uses choco for git", async () => {
-		const result = await runCli(["install", "--dry-run", "--os", "windows", "--config", catalogPath], {
-			cwd: catalogDir,
-			env: { WORKERSTACK_SYSTEM_OS: undefined },
-		})
-		expect(result.exitCode).toBe(0)
-		expect(result.stdout).toContain("dnsmasq@2.92 — not available on windows")
-		expect(result.stdout).toContain("choco install git --version=2.39.5")
-		expect(result.stdout).toContain("choco install nodejs --version=22.12.0")
-		expect(result.stdout).toContain("irm bun.sh/install.ps1")
-	})
-
-	test("dry-run --os macos uses brew and darwin node tarball", async () => {
-		const result = await runCli(["install", "--dry-run", "--os", "macos", "--config", catalogPath], {
-			cwd: catalogDir,
-			env: { WORKERSTACK_SYSTEM_OS: undefined },
-		})
-		expect(result.exitCode).toBe(0)
-		expect(result.stdout).toContain("brew install git")
-		expect(result.stdout).toContain("node-v22.12.0-darwin-")
-		expect(result.stdout).toContain("epiphany@46.5 — not available on macos")
-	})
-
-	test("dry-run walks linux-apt, linux-dnf, and linux-pacman", async () => {
-		for (const os of ["linux-apt", "linux-dnf", "linux-pacman"] as const) {
+	test("walks every OS target", async () => {
+		for (const os of OS_TARGETS) {
 			const result = await runCli(["install", "--dry-run", "--os", os, "--config", catalogPath], {
 				cwd: catalogDir,
 				env: { WORKERSTACK_SYSTEM_OS: undefined },
 			})
-			expect(result.exitCode).toBe(0)
+			expect(result.exitCode, os).toBe(0)
 			expect(result.stdout).toContain(`Detected OS: ${os}`)
-			expect(result.stdout).toContain("Found 24 dependencies")
 		}
+	})
+
+	test("--os windows installs into LOCALAPPDATA and marks Linux-only deps unavailable", async () => {
+		const result = await runCli(["install", "--dry-run", "--os", "windows", "--config", catalogPath], {
+			cwd: catalogDir,
+			env: { WORKERSTACK_SYSTEM_OS: undefined },
+		})
+		expect(result.stdout).toContain("chromium@latest — not available on windows")
+		expect(result.stdout).toContain("sqld@0.24.32 — not available on windows")
+		expect(result.stdout).toContain("$env:LOCALAPPDATA\\bin")
+		expect(result.stdout).toContain("choco install git -y")
+	})
+
+	test("list prints the catalog", async () => {
+		const result = await runCli(["list"], { cwd: catalogDir })
+		expect(result.exitCode).toBe(0)
+		for (const name of BUILTIN_NAMES) expect(result.stdout).toContain(`  ${name} `)
 	})
 
 	test("check git succeeds on CI images that have git", async () => {

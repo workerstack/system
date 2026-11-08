@@ -2,1154 +2,318 @@
 
 Formerly [`@lovrozagar/crossdeps`](https://www.npmjs.com/package/@lovrozagar/crossdeps). Same code and history, new name.
 
-Define system dependencies in a TypeScript (or JS) config file. Install, check, and wire their environment on macOS, Linux (apt / dnf / pacman), and Windows with one CLI.
+Every OS dependency a workerstack repo needs, from one config file. Name a built-in tool and its version, `go: "1.27.2"`, and `system install` installs it on macOS, Linux (apt, dnf, pacman) and Windows, puts it first on PATH, and `system check` verifies the version. Anything outside the catalog keeps the full custom form with your own commands.
 
-The published package ships TypeScript source. The CLI shebang is `#!/usr/bin/env bun`, so **Bun is required to run the CLI**.
+This README is the full usage contract. Agents: read it end to end before writing a config or running the CLI.
 
-This README is the full usage contract. If you are an agent, read it end to end before writing a config or invoking the CLI. Every public command, flag, config field, export, and runtime rule is here with an example.
+## Contents
 
-Source and the 24-dep catalog: [github.com/workerstack/system](https://github.com/workerstack/system).
-
-## Table of contents
-
-- [What this is](#what-this-is)
 - [Requirements](#requirements)
-- [Install](#install)
 - [Quick start](#quick-start)
-- [Agent contract](#agent-contract)
-- [Config file](#config-file)
-  - [Discovery](#discovery)
-  - [Export shape](#export-shape)
-  - [`defineConfig`](#defineconfig)
-  - [`SystemDepConfig`](#systemdepconfig)
-  - [`OsCommands`](#oscommands)
-  - [Template variables](#template-variables)
-  - [`EnvVar`](#envvar)
+- [Built-in catalog](#built-in-catalog)
+- [Config](#config)
 - [CLI](#cli)
-  - [Invocation and flags](#invocation-and-flags)
-  - [`install`](#install-1)
-  - [`check`](#check)
-  - [`env`](#env)
-  - [`sync-pm`](#sync-pm)
-  - [Version detection](#version-detection)
-  - [Exit codes](#exit-codes)
-- [OS detection](#os-detection)
-- [How install commands are executed](#how-install-commands-are-executed)
+- [Versions](#versions)
+- [Shell environment](#shell-environment)
 - [Library API](#library-api)
-- [Worked examples](#worked-examples)
-- [package.json integration](#packagejson-integration)
 - [Gotchas](#gotchas)
-- [Changelog](#changelog)
-- [License](#license)
-
-## What this is
-
-`@workerstack/system` is a **system-binary** installer, not an npm/bun package installer.
-
-You write `system.config.ts` listing tools such as `node`, `bun`, `docker`, `adb`. Each entry has:
-
-- a version string
-- per-OS install shell commands
-- an optional version-check command
-- optional `dependsOn` install order
-- optional env-var blocks written into the user shell profile
-
-Then:
-
-```bash
-bunx system install              # install missing deps for this OS
-bunx system install --upgrade    # also re-run installers on version mismatch
-bunx system check                # report installed vs expected
-bunx system env                  # write env blocks for deps that define env
-bunx system sync-pm              # write package.json "packageManager": "bun@<version>"
-```
-
-It does **not**:
-
-- install npm/bun workspace packages
-- rewrite PATH so a newly installed binary wins over brew/nvm/fnm (it warns)
-- install `dependsOn` targets when you install a single name
-- support JSON/YAML/TOML config (modules only: `.ts` / `.js` / `.mjs`)
-- expose `env.ts` / `exec.ts` helpers as public API
 
 ## Requirements
 
-| Need          | Detail                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------ |
-| Bun           | CLI is `src/cli.ts` with `#!/usr/bin/env bun`. `npx system` / `bunx system` only work if `bun` is on `PATH`. |
-| Config module | Loaded with dynamic `import()`. Must be valid ESM that Bun can import.                                       |
-| Privileges    | Install commands run as-is. If a command uses `sudo` / `choco` / `brew`, the machine must allow that.        |
-| Network       | Most catalog commands download installers. Offline machines will fail those commands.                        |
-
-The library API (`defineConfig`, `detectOs`, …) can be imported from TypeScript that resolves `.ts` exports (Bun, or a bundler). There is no compiled `dist/`.
-
-## Install
-
-```bash
-npm install -D @workerstack/system
-# or
-bun add -D @workerstack/system
-```
-
-The bin name is `system`. After install:
-
-```bash
-bunx system
-# prints usage and exits 0 (no command)
-```
+| Need | Detail                                                                                                                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bun  | The CLI is TypeScript with `#!/usr/bin/env bun`. bun is the only supported package manager.                                                 |
+| OS   | macOS, Linux with apt, dnf or pacman, Windows (PowerShell).                                                                                 |
+| CPU  | Built-ins ship x64 and arm64 recipes. Custom deps run anywhere.                                                                             |
+| sudo | Only OS packages use it (`git`, `curl`, `chromium`, `ffmpeg`, `docker` on Linux, playwright's apt deps). Everything else installs per user. |
 
 ## Quick start
 
-Create `system.config.ts` in the project root (the directory you will run the CLI from):
+```bash
+bun add -d @workerstack/system
+```
+
+`system.config.ts`:
 
 ```ts
 import { defineConfig } from "@workerstack/system"
 
 export default defineConfig({
-	packageJsonPath: "package.json",
 	deps: {
-		node: {
-			description: "JavaScript runtime",
-			required: true,
-			version: "22.12.0",
-			os: {
-				macos:
-					"curl -fsSL https://nodejs.org/dist/v{{version}}/node-v{{version}}-darwin-{{arch}}.tar.gz | sudo tar -xz -C /usr/local --strip-components=1",
-				"linux-apt":
-					"curl -fsSL https://nodejs.org/dist/v{{version}}/node-v{{version}}-linux-x64.tar.gz | sudo tar -xz -C /usr/local --strip-components=1",
-				windows: "choco install nodejs --version={{version}}",
-			},
-		},
-		bun: {
-			description: "JavaScript runtime and package manager",
-			required: true,
-			version: "1.3.11",
-			os: {
-				all: 'curl -fsSL https://bun.sh/install | bash -s "bun-v{{version}}"',
-				windows: 'powershell -c "irm bun.sh/install.ps1|iex" && bun upgrade --to {{version}}',
-			},
+		bun: "1.4.4",
+		go: "1.27.2",
+		uv: "0.13.1",
+		ruff: "0.17.1",
+		java: "21",
+		ffmpeg: { required: false, version: "latest" },
+		"stripe-cli": {
+			description: "Stripe CLI",
+			os: { macos: "brew install stripe/stripe-cli/stripe", windows: false },
+			required: false,
+			version: "1.53.0",
 		},
 	},
 })
 ```
 
 ```bash
-bunx system install
-bunx system install --upgrade
-bunx system check
-bunx system install --dry-run
-bunx system sync-pm
+bunx system install          # everything, prerequisites first
+bunx system check            # installed vs pinned, exit 1 when a required dep is missing
+bunx system install go --upgrade
+bunx system list             # the built-in catalog
 ```
 
-## Agent contract
+## Built-in catalog
 
-Follow these rules. They are the actual runtime, not suggestions.
+A built-in takes only a version. The catalog supplies install commands for every OS and CPU, the version check, PATH entries and prerequisites. `system list` prints this table.
 
-1. Config files must be named `system.config.ts`, `system.config.js`, or `system.config.mjs` in `cwd`, or passed with `--config <path>`.
-2. The file must export an object with a `deps` field. Default export is preferred. A named export also works if it has `deps`.
-3. `defineConfig` is an identity helper that types the object and defaults `packageJsonPath` to `"package.json"`. You can export a plain object instead.
-4. OS targets are exactly: `macos`, `linux-apt`, `linux-dnf`, `linux-pacman`, `windows`.
-5. Install command resolution: per-OS string wins; else `os.all`; `false` means unavailable (overrides `all`); omitted key with no `all` means unavailable.
-6. `{{name}}`, `{{version}}`, `{{major}}`, `{{arch}}` are interpolated in `os` commands and `check.command`. `{{arch}}` is `arm64` only when `process.arch === "arm64"`; every other arch is `amd64`.
-7. Default check command is `{{name}} --version`. A dep is "installed" only if the check binary exists **and** stdout/stderr of the check command matches `(\d+\.\d+[\w.-]*)`.
-8. `install` (no name) topologically sorts by `dependsOn`. `install <name>` installs **only** that name and does **not** walk `dependsOn`.
-9. `install` skips when a detected version **matches** the pin (`latest` or substring either way). Mismatch without `--upgrade` skips, prints the resolved binary path, and hints `system install <name> --upgrade`. `--upgrade` re-runs the install command on mismatch only. After that command succeeds, if PATH still reports a non-matching version, print a shadow warning (do not fail). `--dry-run` never skips.
-10. Failed **required** deps fail `install` (exit 1). Failed **optional** deps are counted as skipped.
-11. Unavailable on this OS is not a failure.
-12. `check` / `check <name>` snapshot PATH once from a new interactive TTY (bash: `$SHELL -ic` with stdin `/dev/null`, not login-only `-lc`; zsh: `$SHELL -lic`; Windows: `powershell.exe` **with** profile, `$env:Path`). The spawn env is a keep-list (HOME/SHELL/locale/TERM) plus a stock PATH — not the caller's PATH or leftover toolchain exports. `--here` uses this process PATH. Spawn failure or empty PATH → this process PATH and one warning (do not crash). `install` / `--upgrade` always use this process PATH.
-13. `check` (all): missing **required** → exit 1. Version mismatch → warning, exit 0. Missing optional → warning, exit 0.
-14. `check <name>`: missing → exit 1 even if the dep is optional. Unavailable → exit 0. Any detected version → exit 0 (no match check).
-15. `sync-pm` only reads `deps.bun`. Skips if `bun` is absent or `version` is `"latest"`. Rewrites `package.json` by string replace, relative to the **config file directory**.
-16. `env` writes `~/.zshrc` or `~/.bashrc` on Unix, and `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` on Windows. Detected paths are written **unexpanded** (`$HOME/...`, not the resolved path).
-17. On Windows, commands matching PowerShell markers run in `powershell.exe`. Everything else runs in `cmd.exe`. On Unix, commands run in `/bin/bash`.
-18. `--os <target>` sets `WORKERSTACK_SYSTEM_OS` for the process. Invalid targets exit 1.
-19. Unknown CLI command → print usage, exit 1. No command → print usage, exit 0.
-20. Public library surface is only what `@workerstack/system` re-exports from `index.ts`. Do not import `./env.ts`, `./exec.ts`, or `./path.ts` from the package.
-21. Circular `dependsOn` logs a warning and still installs every node once.
+| Name                 | Group      | Version         | Where                   | What                                                                                                        |
+| -------------------- | ---------- | --------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `brew`               | bootstrap  | `latest` only   | macOS                   | Homebrew, the macOS package manager.                                                                        |
+| `choco`              | bootstrap  | `latest` only   | Windows                 | Chocolatey, the Windows package manager (needs an admin shell).                                             |
+| `bun`                | runtimes   | exact pin       | all                     | Bun: runtime and the only package manager (its version also pins packageManager).                           |
+| `deno`               | runtimes   | exact pin       | all                     | Deno, for the generated TypeScript SDK checks.                                                              |
+| `node`               | runtimes   | exact pin       | all                     | Node.js runtime, for tools that need it (bun stays the package manager).                                    |
+| `dotnet`             | languages  | exact pin       | all                     | .NET SDK, for the generated C# SDK (dotnet format included).                                                |
+| `go`                 | languages  | exact pin       | all                     | Go toolchain (gofmt included), for the generated Go SDK and CLI.                                            |
+| `google-java-format` | languages  | exact pin       | all                     | google-java-format, the generated Java SDK's formatter. Needs `java`.                                       |
+| `gradle`             | languages  | exact pin       | all                     | Gradle, the generated Java SDK's build. Needs `java`.                                                       |
+| `java`               | languages  | exact pin       | all                     | Eclipse Temurin JDK: a feature major (21) or an exact release (21.0.13+9).                                  |
+| `mypy`               | languages  | exact pin       | all                     | mypy, the generated Python SDK's type check (uv tool). Needs `uv`.                                          |
+| `python`             | languages  | exact pin       | all                     | Python, managed by uv (python and python3 shims). Needs `uv`.                                               |
+| `ruff`               | languages  | exact pin       | all                     | ruff, the generated Python SDK's formatter and linter (uv tool). Needs `uv`.                                |
+| `rust`               | languages  | exact pin       | all                     | Rust via rustup (rustfmt and clippy), for the generated Rust SDK.                                           |
+| `uv`                 | languages  | exact pin       | all                     | uv, the Python toolchain manager.                                                                           |
+| `curl`               | release    | `latest` only   | all                     | HTTP client the install commands use (the OS package manager's current build). Needs `brew`, `choco`.       |
+| `git`                | release    | `latest` only   | all                     | Version control (the OS package manager's current build). Needs `brew`, `choco`.                            |
+| `gh`                 | release    | exact pin       | all                     | GitHub CLI, for releases, PRs and the API.                                                                  |
+| `goreleaser`         | release    | exact pin       | all                     | Release automation for the generated Go CLI.                                                                |
+| `cosign`             | release    | exact pin       | all                     | Sigstore signing for release artifacts.                                                                     |
+| `jq`                 | release    | exact pin       | all                     | JSON processor.                                                                                             |
+| `pwsh`               | release    | exact pin       | all                     | PowerShell 7, for the generated Windows install scripts.                                                    |
+| `shellcheck`         | release    | exact pin       | all                     | Shell script linter, for the generated install scripts.                                                     |
+| `cf`                 | cloudflare | exact pin       | all                     | Cloudflare CLI: deploy, workers types, account operations (bun global). Needs `bun`.                        |
+| `cloudflared`        | cloudflare | exact pin       | all                     | Cloudflare Tunnel client, for remote bindings.                                                              |
+| `atlas`              | database   | exact pin       | all                     | Atlas schema migrations.                                                                                    |
+| `sqld`               | database   | exact pin       | apt, dnf, pacman, macOS | libSQL server, for local database tests (no Windows build).                                                 |
+| `chromium`           | browsers   | `latest` only   | apt, dnf, pacman        | Chromium, the browser rail fallback (Linux only: brew and choco ship no usable build).                      |
+| `docker`             | browsers   | `latest` only   | all                     | Container engine with its daemon (Docker Engine on Linux, Docker Desktop elsewhere). Needs `brew`, `choco`. |
+| `lightpanda`         | browsers   | `latest` only   | apt, dnf, pacman, macOS | Lightpanda, the default headless browser rail (nightly; no Windows build).                                  |
+| `playwright`         | browsers   | exact pin       | all                     | Playwright's Chromium for browser tests (version = your @playwright/test). Needs `bun`.                     |
+| `claude`             | agents     | pin or `latest` | all                     | Claude Code CLI (native installer; self-updates unless DISABLE_AUTOUPDATER=1).                              |
+| `codex`              | agents     | exact pin       | all                     | OpenAI Codex CLI (bun global). Needs `bun`.                                                                 |
+| `ffmpeg`             | agents     | `latest` only   | all                     | ffmpeg, for /listen mic capture (the OS package manager's current build). Needs `brew`, `choco`.            |
+| `grok`               | agents     | pin or `latest` | all                     | Grok Build CLI by xAI (native installer).                                                                   |
+| `rtk`                | agents     | exact pin       | all                     | rtk, shell output compression behind the agent Bash hook.                                                   |
 
-## Config file
+Where things land:
+
+- Single binaries: `$HOME/.local/bin`, or `%LOCALAPPDATA%\bin` on Windows (added to the user PATH).
+- Toolchains that need their files together (go, node, java, gradle, dotnet, pwsh): `$HOME/.local/share/<tool>`, or `%LOCALAPPDATA%\Programs\<tool>`.
+- Installers with their own home keep it: bun `~/.bun`, deno `~/.deno`, rust `~/.cargo`, grok `~/.grok`, claude and uv's Python and tools `~/.local/bin`.
+- Global JS CLIs (`cf`, `codex`) install with `bun i -g`.
+
+Version policy, checked when the config loads:
+
+- **exact pin**: `"latest"` is an error.
+- **`latest` only**: the source cannot pin (OS package managers, nightly builds). Any other version is an error.
+- **pin or `latest`**: either.
+
+Prerequisites: a built-in that needs `brew` or `choco` gets it added automatically. Any other missing prerequisite is an error that names the fix:
+
+```
+Invalid system config:
+  - deps.ruff: needs uv; add uv: "<version>"
+```
+
+## Config
 
 ### Discovery
 
-The CLI looks at `process.cwd()`, not the config file's parent, to find a convention name.
+`system.config.ts`, `system.config.js` or `system.config.mjs` in the working directory, or `--config <path>`. Export the config as `export default defineConfig(...)`, or as any named export holding `deps`.
 
-Search order:
+| Field             | Type   | Default          | Meaning                                                                                  |
+| ----------------- | ------ | ---------------- | ---------------------------------------------------------------------------------------- |
+| `deps`            | object | required         | One entry per dependency, by name                                                        |
+| `packageJsonPath` | string | `"package.json"` | The package.json whose `packageManager` follows the bun pin, relative to the config file |
 
-1. `--config <path>` (resolved with `path.resolve(cwd, path)`). Missing flag value → exit 1. File does not exist → exit 1.
-2. First existing of:
-   - `system.config.ts`
-   - `system.config.js`
-   - `system.config.mjs`
-3. None found → exit 1:
+### Entry forms
 
-```
-No system config found. Create one of: system.config.ts, system.config.js, system.config.mjs
-```
-
-There is no `system.config.json`. There is no recursive walk up parent directories.
-
-```bash
-# convention name in cwd
-bunx system install
-
-# explicit path (any filename, must exist)
-bunx system install --config ./tooling/deps.ts
-bunx system check --config /abs/path/system.config.ts
-```
-
-### Export shape
-
-The loader `import()`s the file and accepts:
-
-1. `export default defineConfig({ deps, packageJsonPath? })`
-2. `export default { deps, packageJsonPath? }`
-3. Any named export whose value is an object with a `deps` field (first such value in `Object.values` order)
+A built-in name takes one of two forms:
 
 ```ts
-// preferred
-export default defineConfig({ deps: {/* ... */} })
+go: "1.27.2"
 
-// also valid
-export const config = defineConfig({ deps: {/* ... */} })
-
-// also valid (no defineConfig)
-export default {
-	deps: {
-		jq: {
-			description: "JSON processor",
-			required: false,
-			version: "1.8.1",
-			os: { all: "echo install jq" },
-		},
-	},
+go: {
+	version: "1.27.2",
+	required: false,                       // default true
+	description: "Go for the CLI",          // replaces the catalog's
+	os: { windows: false },                // merges per OS key over the catalog's commands
+	check: { command: "go version" },      // replaces
+	env: [{ path: "/opt/go/bin" }],        // replaces
+	dependsOn: [],                         // replaces
 }
 ```
 
-If nothing exported has `deps`:
-
-```
-Config file must export an object with a `deps` field (use defineConfig)
-```
-
-and the process exits 1.
-
-### `defineConfig`
+Any other name is a custom dep and needs the full form. `defineConfig` checks each key: a version string under a custom name is a type error.
 
 ```ts
-function defineConfig(options: { packageJsonPath?: string; deps: Record<string, SystemDepConfig> }): SystemConfig
-```
-
-| Field             | Type                              | Default          | Meaning                                                                                                              |
-| ----------------- | --------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `deps`            | `Record<string, SystemDepConfig>` | required         | Map of dep key → config. The key is `{{name}}`.                                                                      |
-| `packageJsonPath` | `string`                          | `"package.json"` | Path used by `sync-pm` and the `check` packageManager probe. **Relative to the config file's directory**, not `cwd`. |
-
-```ts
-import { defineConfig } from "@workerstack/system"
-
-export default defineConfig({
-	packageJsonPath: "./apps/web/package.json",
-	deps: {
-		bun: {
-			description: "JavaScript runtime and package manager",
-			required: true,
-			version: "1.3.11",
-			os: { all: 'curl -fsSL https://bun.sh/install | bash -s "bun-v{{version}}"' },
-		},
-	},
-})
-```
-
-Calling `defineConfig` does not validate commands or OS keys. It returns `{ deps, packageJsonPath }` with the default filled in.
-
-### `SystemDepConfig`
-
-```ts
-interface SystemDepConfig {
-	description: string
-	required: boolean
-	version: string
-	os: OsCommands
-	check?: { command: string }
-	dependsOn?: string[]
-	env?: EnvVar[]
-}
-```
-
-| Field         | Required | Example                          | Meaning                                                                                                                                                                                |
-| ------------- | -------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description` | yes      | `"JSON processor"`               | Printed by `install` / `check`. Not used for logic.                                                                                                                                    |
-| `required`    | yes      | `true`                           | If `true`, a failed `install` of this dep increments Failed and exits 1. If `false`, a failed install is counted as Skipped. Unused by single-target `check` (missing always exits 1). |
-| `version`     | yes      | `"1.8.1"` or `"latest"`          | Interpolated as `{{version}}`. `"latest"` makes `check` treat any detected version as OK, and makes `sync-pm` skip.                                                                    |
-| `os`          | yes      | `{ all: "brew install jq" }`     | Per-OS install commands. See [OsCommands](#oscommands).                                                                                                                                |
-| `check`       | no       | `{ command: "atlas version" }`   | Version-check command. Default: `"{{name}} --version"`. Interpolates the same templates as `os`.                                                                                       |
-| `dependsOn`   | no       | `["node", "npm"]`                | Keys that must be installed **before** this one when running `install` with no name. Unknown keys are ignored.                                                                         |
-| `env`         | no       | `[{ key: "FOO", value: "bar" }]` | Written by `install` (after a successful install) and by `system env`.                                                                                                                 |
-
-Every field together:
-
-```ts
-stripe: {
-	description: "Stripe CLI",
-	required: true,
-	version: "1.21.0",
-	dependsOn: ["brew"],
-	check: { command: "stripe version" },
-	os: {
+"stripe-cli": {
+	description: "Stripe CLI",                      // required
+	version: "1.53.0",                              // required; "latest" allowed
+	required: false,                                // required
+	os: {                                           // required, at least one key
+		all: "curl … {{version}} …",                  // every OS not listed
 		macos: "brew install stripe/stripe-cli/stripe",
-		"linux-apt": "curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/public | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg && sudo apt-get install -y stripe",
-		windows: "choco install stripe-cli --version={{version}}",
-		"linux-dnf": false,
-		"linux-pacman": false,
+		windows: false,                               // explicitly unavailable
 	},
-	env: [{ key: "STRIPE_CLI_TELEMETRY_OPTOUT", value: "1" }],
+	check: { command: "stripe version", pattern: "(\\d+\\.\\d+\\.\\d+)" }, // default "{{name}} --version"
+	dependsOn: ["curl"],
+	env: [{ path: "$HOME/.stripe/bin" }],
 }
 ```
 
-### `OsCommands`
+`os` keys: `all`, `linux-apt`, `linux-dnf`, `linux-pacman`, `macos`, `windows`. An OS key overrides `all`, `false` makes the dep unavailable there, and a missing key without `all` means unavailable.
 
-```ts
-type OsTarget = "linux-apt" | "linux-dnf" | "linux-pacman" | "macos" | "windows"
-type OsCommands = Partial<Record<OsTarget, string | false>> & { all?: string }
-```
+Templates in `os` commands and `check.command`: `{{name}}`, `{{version}}`, `{{major}}` (the first dot segment) and `{{arch}}` (`arm64`, else `amd64`).
 
-`OS_TARGETS` (exported) is `["linux-apt", "linux-dnf", "linux-pacman", "macos", "windows"]`.
+`check.pattern` is a regex source whose first capture is the version, for tools whose output the default rule misreads.
 
-Resolution for a given target:
+### `env`
 
-| `os[target]` | `os.all` | Result                    |
-| ------------ | -------- | ------------------------- |
-| string       | anything | that string, interpolated |
-| `false`      | anything | unavailable (`null`)      |
-| omitted      | string   | `os.all`, interpolated    |
-| omitted      | omitted  | unavailable (`null`)      |
+| Entry                                                                                                       | Writes                                                                             |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `{ path: "$HOME/tool/bin" }`                                                                                | The directory first on PATH, so the pinned binary wins                             |
+| `{ key: "GOPATH", value: "$HOME/go" }`                                                                      | The variable                                                                       |
+| `{ key: "ANDROID_HOME", detect: ["$HOME/Android/Sdk", "/opt/android-sdk"], fallback: "$HOME/Android/Sdk" }` | The first `detect` path that exists, else `fallback`. Nothing when neither applies |
 
-```ts
-// same command everywhere
-os: { all: "npm install -g {{name}}@{{version}}" }
+Values are written as-is; the shell expands `$HOME`. `detect` paths expand `$VAR`, `${VAR}` and `%VAR%` from the environment to test for existence.
 
-// same everywhere except Windows
-os: {
-	all: 'curl -fsSL https://bun.sh/install | bash -s "bun-v{{version}}"',
-	windows: 'powershell -c "irm bun.sh/install.ps1|iex" && bun upgrade --to {{version}}',
-}
+### Validation
 
-// Linux only; macOS/Windows unavailable
-os: {
-	"linux-apt": "sudo apt-get install -y {{name}}",
-	"linux-dnf": "sudo dnf install -y {{name}}",
-	"linux-pacman": "sudo pacman -S --noconfirm {{name}}",
-}
-
-// available on Unix, explicitly not on Windows (overrides all)
-os: {
-	all: "cargo install {{name}} --version {{version}} --locked",
-	windows: false,
-}
-```
-
-Unavailable is printed as:
+The config is validated before anything installs. Every problem is listed with its path:
 
 ```
-name@version — not available on linux-apt
+Invalid system config:
+  - deps.go.verison: unknown key (allowed: check, dependsOn, description, env, os, required, version)
+  - deps.tool.os: must name at least one OS key or all
+  - deps.tool.env[0]: appendToPath is gone; use { path: "/opt/tool/bin" } (it goes first on PATH)
 ```
 
-It is not a failure.
-
-### Template variables
-
-Replaced globally (`replace(/\{\{name\}\}/g, …)`) in every `os` command and in `check.command`.
-
-| Token         | Source                                                                 | Example input                                             | Example output |
-| ------------- | ---------------------------------------------------------------------- | --------------------------------------------------------- | -------------- |
-| `{{name}}`    | dep key                                                                | key `stripe-cli`                                          | `stripe-cli`   |
-| `{{version}}` | `config.version` as-is                                                 | `"22.12.0"`                                               | `22.12.0`      |
-| `{{major}}`   | first `.` segment of `version`, or the whole string if there is no `.` | `"22.12.0"` → `22`; `"stable"` → `stable`                 |
-| `{{arch}}`    | `process.arch === "arm64" ? "arm64" : "amd64"`                         | Apple Silicon → `arm64`; `x64` / `ia32` / `arm` → `amd64` |
-
-```ts
-os: {
-	macos:
-		"curl -fsSL https://nodejs.org/dist/v{{version}}/node-v{{version}}-darwin-{{arch}}.tar.gz -o /tmp/node.tgz",
-}
-check: { command: "{{name}}-{{major}} --version" }
-```
-
-There are no other tokens. `{{os}}`, `{{home}}`, and env vars are not interpolated here. Put `$HOME` / `%USERPROFILE%` in the shell command itself if you need them at install time.
-
-### `EnvVar`
-
-```ts
-interface EnvVar {
-	key: string
-	value?: string
-	appendToPath?: boolean
-	detect?: string[]
-	fallback?: string
-}
-```
-
-| Field          | Meaning                                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key`          | Variable name (`ANDROID_HOME`, `PATH`, …). For `appendToPath: true` the written line still uses PATH/`$env:Path`; `key` is only for logging. |
-| `value`        | Used when `detect` is absent or empty. Written as-is (not expanded by `system`).                                                             |
-| `detect`       | Candidate paths. First path that exists **after expansion** wins. The **original unexpanded** string is what gets written.                   |
-| `fallback`     | Used when every `detect` path is missing. Written as-is.                                                                                     |
-| `appendToPath` | If true, append to PATH instead of `export KEY=value`.                                                                                       |
-
-Path expansion for `detect` existence checks only substitutes:
-
-| Token            | Becomes                            |
-| ---------------- | ---------------------------------- |
-| `$HOME`          | `os.homedir()`                     |
-| `%USERPROFILE%`  | `os.homedir()` (case-insensitive)  |
-| `%HOME%`         | `os.homedir()` (case-insensitive)  |
-| `$ANDROID_HOME`  | `process.env.ANDROID_HOME` or `""` |
-| `%ANDROID_HOME%` | `process.env.ANDROID_HOME` or `""` |
-
-No other `$VAR` / `%VAR%` tokens are expanded.
-
-Resolution order per `EnvVar`:
-
-1. If `detect` is a non-empty array: first existing expanded path → return the **unexpanded** detect string. Else if `fallback` is set → return `fallback`. Else skip this var (log, do not write).
-2. Else return `value` or `null`.
-
-```ts
-env: [
-	{
-		key: "ANDROID_HOME",
-		detect: ["$HOME/Android/sdk", "$HOME/Library/Android/sdk", "/usr/lib/android-sdk"],
-		fallback: "$HOME/Android/sdk",
-	},
-	{ key: "PATH", appendToPath: true, value: "$ANDROID_HOME/platform-tools" },
-	{ key: "PATH", appendToPath: true, value: "$ANDROID_HOME/emulator" },
-]
-```
-
-If `$HOME/Library/Android/sdk` exists, the profile gets `export ANDROID_HOME="$HOME/Library/Android/sdk"` (the detect string), not the resolved `/Users/you/Library/Android/sdk`.
-
-Written blocks are wrapped in markers and replaced on the next run:
-
-```bash
-# android-sdk environment (managed by @workerstack/system)
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-export PATH="$PATH:$ANDROID_HOME/platform-tools"
-# end android-sdk environment
-```
-
-PowerShell 7:
-
-```powershell
-# android-sdk environment (managed by @workerstack/system)
-$env:ANDROID_HOME = "$HOME/Library/Android/sdk"
-$env:Path += ";$ANDROID_HOME/platform-tools"
-# end android-sdk environment
-```
-
-Target files:
-
-| Platform                                    | File                                                                                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Windows                                     | `{homedir}/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (PowerShell 7, not Windows PowerShell 5 `WindowsPowerShell`) |
-| Unix and `process.env.SHELL` contains `zsh` | `{homedir}/.zshrc`                                                                                                             |
-| Other Unix                                  | `{homedir}/.bashrc`                                                                                                            |
-
-After writing, the CLI prints:
-
-- Unix: `Run: source ~/.bashrc` (or `.zshrc`)
-- Windows: `Restart PowerShell or run: . $PROFILE`
-
-`install` writes env only after a **successful** install of that dep (not on skip, not on dry-run). `system env` writes every dep that has `env`, regardless of install state.
+A `dependsOn` name missing from the config and a dependency cycle (`dependency cycle: a → b → a`) are errors too.
 
 ## CLI
 
 ```
-Usage: system <command> [args]
-
-Commands:
-  install              Install all deps (auto-detect OS)
-  install <name>       Install single dep
-  check                Check all deps
-  check <name>         Check single dep
-  env                  Setup environment variables
-  sync-pm              Sync packageManager field in package.json
-
-Flags:
-  --config <path>      Config file (default: system.config.ts in cwd)
-  --os <target>        Force OS target (or set WORKERSTACK_SYSTEM_OS)
-  --dry-run            Print install commands without running them
-  --upgrade            Re-run install when the detected version does not match
-  --here               check: use this process PATH instead of an interactive-shell snapshot
+system <command> [args] [flags]
 ```
 
-### Invocation and flags
+| Command          | Does                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| `install`        | Install every dep for this OS, prerequisites first                                  |
+| `install <name>` | Install one dep                                                                     |
+| `check`          | Report installed vs pinned for every dep, plus `packageManager` against the bun pin |
+| `check <name>`   | Report one dep                                                                      |
+| `env`            | Write every dep's env block into the shell rc files                                 |
+| `sync-pm`        | Set package.json `packageManager` to `bun@<bun pin>`, keeping its formatting        |
+| `list`           | Print the built-in catalog                                                          |
+
+| Flag              | Meaning                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| `--config <path>` | Config file instead of discovery                                                      |
+| `--os <target>`   | Use another OS's command set (or set `WORKERSTACK_SYSTEM_OS`). For dry-runs and tests |
+| `--dry-run`       | Print the install commands without running them                                       |
+| `--upgrade`       | Reinstall a dep whose installed version does not match                                |
+| `--here`          | `check` with this process's PATH instead of a new interactive shell's                 |
+
+`install` skips a dep already at the pinned version. A present but mismatched dep is skipped with a `run: system install <name> --upgrade` hint unless `--upgrade` is set. After a successful install, the dep's env block is written, and a warning appears if another binary still wins on PATH.
+
+`check` reads PATH from a new interactive shell (`bash -ic`, `zsh -lic`, Windows PowerShell with its profile), so it sees what a fresh terminal sees, including blocks `install` just wrote. If that shell cannot start, it falls back to this process's PATH with one warning. A check command that runs longer than 30 seconds is killed and reported.
+
+Exit codes:
+
+| Command   | 0                                                    | 1                                                    |
+| --------- | ---------------------------------------------------- | ---------------------------------------------------- |
+| `install` | every required dep installed, skipped or unavailable | a required dep failed                                |
+| `check`   | no required dep missing (mismatches only warn)       | a required dep is missing                            |
+| `env`     | every block written                                  | a dep's variables could not be resolved              |
+| `sync-pm` | updated, already correct, or skipped                 | package.json could not be read or written            |
+| any       |                                                      | bad flag, unknown command, missing or invalid config |
+
+## Versions
+
+The installed version is the first `N.N…` in the check output, or `check.pattern`'s capture. It matches the pin when:
+
+- the pin is `latest`;
+- the pin's dot segments prefix the installed ones: `22` matches `22.20.0`, and `1.27.1` matches `1.27.1` but never `1.27.10`;
+- a prerelease (`-beta.12`) is exact on both sides;
+- build metadata (`+9`) on the installed side is ignored unless the pin has some, so `java: "21"` matches `21.0.13+9`.
+
+## Shell environment
+
+`env` and `install` write one managed block per dep:
 
 ```bash
-bunx system <command> [name] [--config <path>] [--os <target>] [--dry-run] [--upgrade] [--here]
+# go environment (managed by @workerstack/system)
+export PATH="$HOME/.local/share/go/bin:$PATH"
+export PATH="$HOME/go/bin:$PATH"
+# end go environment
 ```
 
-Flags may appear before or after the command. Each flag is stripped once (first occurrence).
-
-| Flag / env              | Applies to     | Behavior                                                                                                                                               |
-| ----------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--config <path>`       | all commands   | Required path argument. Must exist.                                                                                                                    |
-| `--os <target>`         | all commands   | Must be one of `OS_TARGETS`. Sets `process.env.WORKERSTACK_SYSTEM_OS`. Missing value or unknown target → exit 1.                                       |
-| `WORKERSTACK_SYSTEM_OS` | all commands   | Same as `--os` when `--os` is not passed.                                                                                                              |
-| `--dry-run`             | `install` only | Prints `dry-run: <command>` and counts the dep as installed. Silently ignored by `check` / `env` / `sync-pm`.                                          |
-| `--upgrade`             | `install` only | Re-run the install command when the detected version does **not** match the pin. Matching versions still skip. Ignored by `check` / `env` / `sync-pm`. |
-| `--here`                | `check` only   | Use this process PATH instead of an interactive-shell snapshot. Ignored by `install` / `env` / `sync-pm`.                                              |
-
-```bash
-bunx system install
-bunx system install node
-bunx system install --upgrade
-bunx system install node --upgrade
-bunx system install --dry-run
-bunx system install node --os windows --dry-run
-bunx system --config ./deps.ts --os linux-dnf check bun
-bunx system check --here
-bunx system check node --here
-WORKERSTACK_SYSTEM_OS=macos bunx system install --dry-run
-```
-
-Unknown command:
-
-```bash
-bunx system foo
-# prints USAGE
-# Unknown command: foo
-# exit 1
-```
-
-No command:
-
-```bash
-bunx system
-# prints USAGE
-# exit 0
-```
-
-`--os` without a value:
-
-```bash
-bunx system install --os
-# --os requires a target argument
-# exit 1
-```
-
-`--os freebsd`:
-
-```
-Unknown OS target: freebsd. Expected one of: linux-apt, linux-dnf, linux-pacman, macos, windows
-```
-
-exit 1.
-
-### `install`
-
-**All deps** (`system install`):
-
-1. Detect OS.
-2. Print every dep with `[required]` / `[optional]` and mark those with no command as `(not available on <os>)`.
-3. Sort with `sortByDependencies` (`dependsOn` first).
-4. For each dep, run the [single-dep steps](#single-dep-steps) below.
-5. Print summary: Installed / Skipped / Unavailable / Failed.
-6. Exit 1 if Failed > 0.
-
-**One dep** (`system install node`):
-
-1. Unknown name → `Unknown dependency: node` plus `Available: …`, exit 1.
-2. Run the single-dep steps. Do **not** install `dependsOn` first.
-3. Exit 1 only if that dep **failed**. Unavailable and skipped exit 0.
-
-#### Single-dep steps
-
-1. Resolve the install command for the detected OS. None → log unavailable, return.
-2. If `--dry-run` → print `dry-run: <command>`, return **installed** (no check, no exec, no env write).
-3. If [version detection](#version-detection) returns a string that **matches** the pin → print `Already installed (<ver>), skipping`, return skipped.
-4. If a version is detected but does **not** match, and `--upgrade` is off → print `Already installed (<ver>), skipping (expected <pin>)` plus the resolved binary path and `run: system install <name> --upgrade`, return skipped.
-5. Run the command. Success → print `Installed successfully`, then if `env` is non-empty run the env writer. Re-check the version; if PATH still does not match, print a shadow warning. Return installed.
-6. Failure → print `Installation failed`. Required → failed. Optional → skipped.
-
-Matching uses the same table as `check`. `--upgrade` does not re-run a dep whose detected version already matches.
-
-### `check`
-
-PATH for version probes is snapshotted **once** per `check` invocation:
-
-- Default: interactive TTY PATH (bash: `$SHELL -ic` with stdin `/dev/null`; zsh: `$SHELL -lic`; Windows: `powershell.exe` with profile, `$env:Path`). Spawn env is a keep-list (HOME/SHELL/locale/TERM) plus a stock PATH, not the caller's PATH or leftover toolchain exports.
-- `--here`: this process PATH.
-- Spawn failure or empty PATH: this process PATH, one warning, do not crash.
-
-`install` does not use this snapshot.
-
-**All deps** (`system check`):
-
-For each dep in `Object.entries` order (not topo-sorted):
-
-| Situation                        | Line                                                    | Counter  |
-| -------------------------------- | ------------------------------------------------------- | -------- |
-| No install command on this OS    | `- [required] name — not available on <os>`             | none     |
-| Check found no version, required | `x [required] name — not installed (expected <ver>)`    | Missing  |
-| Check found no version, optional | `x [optional] name — not installed (expected <ver>)`    | Mismatch |
-| Version matches (see below)      | `v [required] name@<installed>`                         | OK       |
-| Version does not match           | `~ [required] name@<installed> (expected <ver>) <path>` | Mismatch |
-
-A version **matches** if any of these is true:
-
-- `config.version === "latest"`
-- `installed === config.version`
-- `config.version.includes(installed)`
-- `installed.includes(config.version)`
-
-Substring either way is intentional so `1.0.1` matches `v1.0.1-1c2aa24-canary` and the reverse.
-
-Then, if `deps.bun` exists, `check` also probes `package.json` at `resolve(configDir, packageJsonPath)`:
-
-| `deps.bun.version` | `packageManager`        | Result   |
-| ------------------ | ----------------------- | -------- |
-| `"latest"`         | starts with `bun@`      | OK line  |
-| `"latest"`         | anything else / missing | Mismatch |
-| other              | exactly `bun@<version>` | OK line  |
-| other              | anything else / missing | Mismatch |
-
-Missing `package.json` throws (fatal, exit 1).
-
-Summary:
-
-```
-OK: N  Mismatch: N  Missing: N
-```
-
-- Missing > 0 → `Required dependencies missing — run: system install`, exit 1.
-- Mismatch > 0 → `Version mismatches found — run: system install --upgrade`, exit 0.
-- Else → `All system dependencies OK`, exit 0.
-
-**One dep** (`system check bun`):
-
-| Situation              | Output                                    | Exit |
-| ---------------------- | ----------------------------------------- | ---- |
-| Unknown name           | `Unknown dependency: …`                   | 1    |
-| Unavailable on this OS | `bun — not available on <os>`             | 0    |
-| No version detected    | `bun — not installed (expected <ver>)`    | 1    |
-| Any version detected   | `bun@<installed> (expected <ver>) <path>` | 0    |
-
-Single-target check does **not** apply the match table. Any parsed version is success, even if it disagrees with `config.version`. Single-target check does **not** honor `required: false` for the missing case.
-
-### `env`
-
-```bash
-bunx system env
-```
-
-Walks every dep that has a non-empty `env` array and writes/replaces that tool's managed block. Does not install anything.
-
-If no dep has `env`:
-
-```
-No dependencies with environment variables configured.
-```
-
-exit 0.
-
-### `sync-pm`
-
-```bash
-bunx system sync-pm
-```
-
-Only uses `deps.bun`.
-
-| Condition                                            | Behavior                                                                                  | Exit                                                                    |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| No `deps.bun`                                        | `Skipping packageManager sync — bun not in config`                                        | 0                                                                       |
-| `deps.bun.version === "latest"`                      | `Skipping packageManager sync — bun version is "latest"`                                  | 0                                                                       |
-| File already has `"packageManager": "bun@<version>"` | `packageManager already correct: bun@<version>`                                           | 0                                                                       |
-| File has a different `packageManager` string         | String-replaces `"packageManager": "<current>"` with `"packageManager": "bun@<version>"`  | 0                                                                       |
-| File has no `packageManager`                         | Injects `,\n\t"packageManager": "bun@<version>"` immediately after `"name": "<pkg.name>"` | 0                                                                       |
-| Read/parse/write throws                              | `Failed to sync packageManager:` + error                                                  | 0 from `cmdSyncPm` (the function returns false; `main` does not exit 1) |
-
-`packageJsonPath` is resolved from the **directory that contains the config file**.
-
-This is a string edit, not a JSON rewrite. It expects the current value to appear exactly as `"packageManager": "<current>"`. Unusual formatting (single quotes, extra spaces) will not match; the inject-after-name path only runs when `packageManager` is missing from the parsed object.
-
-`sync-pm` never writes a `node@` packageManager. Only `bun@<version>`.
-
-### Version detection
-
-Used by `install` (skip if present, **this process PATH**) and `check` (interactive TTY PATH snapshot, or this process PATH with `--here`).
-
-```
-checkCmd = resolveCheckCommand(name, config)
-          = interpolate(config.check?.command ?? "{{name}} --version", name, version)
-
-binary   = first space-separated token of checkCmd
-if binary is set and commandExists(binary) is false → not installed (null)
-
-run checkCmd via execSync
-stdout+stderr must match /(\d+\.\d+[\w.-]*)/
-first match → that string
-no match, non-zero exit, or throw → null
-```
-
-`commandExists`:
-
-1. Strip one pair of surrounding quotes from the token.
-2. If that path `existsSync`, true.
-3. Else run `command -v <token>` (Unix) or `where <token>` (Windows).
-
-Implications:
-
-- Check command `echo android-studio` finds `echo` on PATH, prints `android-studio`, regex misses, result is **not installed**. The check output must contain something like `1.2` / `22.12.0` / `1.0.0-beta`.
-- Check command `"/usr/local/bin/node" --version` works because `commandExists` accepts an existing path.
-- A tool that prints only `stable` or `ok` is treated as missing.
-
-### Exit codes
-
-| Situation                                             | Exit                                                       |
-| ----------------------------------------------------- | ---------------------------------------------------------- |
-| `system` with no command                              | 0                                                          |
-| Unknown command                                       | 1                                                          |
-| `--config` / `--os` missing value or bad `--os`       | 1                                                          |
-| Config file missing or no `deps` export               | 1                                                          |
-| `install` / `check` unknown dep name                  | 1                                                          |
-| `install` required dep command failed                 | 1                                                          |
-| `install` optional dep command failed                 | 0 (counted skipped)                                        |
-| `install` dep unavailable                             | 0                                                          |
-| `install --dry-run`                                   | 0                                                          |
-| `check` all, required missing                         | 1                                                          |
-| `check` all, only version / packageManager mismatches | 0                                                          |
-| `check <name>` missing (even optional)                | 1                                                          |
-| `check <name>` unavailable                            | 0                                                          |
-| `env` / `sync-pm`                                     | 0 (sync-pm file errors are logged, not turned into exit 1) |
-| Uncaught exception                                    | 1 (`Fatal error:`)                                         |
-
-## OS detection
-
-```ts
-detectOs((override = process.env.WORKERSTACK_SYSTEM_OS))
-```
-
-| Input                                             | Result                          |
-| ------------------------------------------------- | ------------------------------- |
-| `override` / `WORKERSTACK_SYSTEM_OS` / `--os` set | `parseOsTarget(value)` or throw |
-| `process.platform === "darwin"`                   | `macos`                         |
-| `process.platform === "win32"`                    | `windows`                       |
-| Linux and `apt-get` on PATH                       | `linux-apt`                     |
-| Linux and `dnf` on PATH                           | `linux-dnf`                     |
-| Linux and `pacman` on PATH                        | `linux-pacman`                  |
-| Linux and none of those                           | `linux-apt` (default)           |
-
-`--os` is implemented by assigning `process.env.WORKERSTACK_SYSTEM_OS` before any detect call.
-
-```bash
-# force the Windows command set while sitting on Linux (does not boot Windows)
-bunx system install --os windows --dry-run
-```
-
-`--os` / `WORKERSTACK_SYSTEM_OS` do **not** change `process.platform`. Env file paths and the PowerShell-vs-cmd router still follow the real kernel. Use `--os` to select which `os.*` command string is resolved, not to emulate another OS's shell.
-
-## How install commands are executed
-
-Unix (`linux-*`, and also when you force `--os windows` from Linux):
-
-```
-execSync(command, { shell: "/bin/bash", stdio: "inherit" })
-```
-
-Multi-line scripts and `&&` / pipes work because the shell is bash.
-
-Windows, **if** the command matches any PowerShell marker:
-
-```
-powershell.exe -NoProfile -NonInteractive -Command <command>
-```
-
-Markers (any one is enough):
-
-| Marker              | Example that trips it                                            |
-| ------------------- | ---------------------------------------------------------------- |
-| `\birm\b`           | `irm bun.sh/install.ps1 \| iex`                                  |
-| `\biex\b`           | same                                                             |
-| `$env:`             | `Invoke-WebRequest … -OutFile "$env:LOCALAPPDATA\bin\atlas.exe"` |
-| `Invoke-WebRequest` | official Windows binary downloads                                |
-| `Invoke-Expression` |                                                                  |
-| `New-Item`          | `New-Item -ItemType Directory -Force …`                          |
-| `Test-Path`         |                                                                  |
-| `Out-Null`          | `… \| Out-Null`                                                  |
-| `Get-Command`       |                                                                  |
-| `$LASTEXITCODE`     |                                                                  |
-
-Windows, otherwise:
-
-```
-execSync(command, { shell: process.env.ComSpec || "cmd.exe", stdio: "inherit" })
-```
-
-so `choco install nginx || choco install nginx` and `bun -e "…"` keep working. `||` is **invalid** in PowerShell; do not add `$env:` / `Out-Null` to a cmd-oriented command or it will be routed to PowerShell and break.
-
-`stdio: "inherit"` means the user sees the installer output live.
+| Shell      | File                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------- |
+| bash       | `~/.bashrc`                                                                             |
+| zsh        | `~/.zshrc`                                                                              |
+| fish       | `$XDG_CONFIG_HOME/fish/conf.d/workerstack-system.fish` (default `~/.config/fish/...`)   |
+| PowerShell | both `Documents\PowerShell\` (pwsh 7) and `Documents\WindowsPowerShell\` (5.1) profiles |
+
+Rewriting a block replaces it in place, and re-running is idempotent. A block written by `crossdeps` (`(managed by crossdeps)`) is replaced, never duplicated.
 
 ## Library API
 
-This is the entire public surface (`src/index.ts`):
-
-```ts
-export type { SystemConfig, EnvVar, OsCommands, OsTarget, SystemDepConfig }
-export { defineConfig, interpolate, OS_TARGETS, resolveCheckCommand, resolveOsCommand, versionsMatch }
-export { sortByDependencies }
-export { commandExists, commandLookup, detectOs, detectOsFromPlatform, parseOsTarget, whichBinary }
-```
-
-### `OS_TARGETS`
-
-```ts
-const OS_TARGETS = ["linux-apt", "linux-dnf", "linux-pacman", "macos", "windows"] as const
-type OsTarget = (typeof OS_TARGETS)[number]
-```
-
-### `defineConfig(options)`
-
-See [defineConfig](#defineconfig). Returns the same object with `packageJsonPath` defaulted.
-
-### `interpolate(template, name, version)`
-
-```ts
-interpolate("{{name}}@{{version}} ({{major}}) {{arch}}", "node", "22.12.0")
-// "node@22.12.0 (22) arm64"  or  "… amd64"
-interpolate("{{major}}", "rust", "stable")
-// "stable"
-```
-
-### `resolveOsCommand(name, config, target)`
-
-```ts
-resolveOsCommand(
-	"git",
-	{
-		description: "git",
-		required: true,
-		version: "2.39.5",
-		os: { all: "echo all", "linux-apt": "apt install git={{version}}" },
-	},
-	"linux-apt",
-)
-// "apt install git=2.39.5"
-
-resolveOsCommand("flux", {/* os: { all: "…", windows: false } */}, "windows")
-// null
-```
-
-### `resolveCheckCommand(name, config)`
-
-```ts
-resolveCheckCommand("node", {/* no check */})
-// "node --version"
-
-resolveCheckCommand("atlas", { check: { command: "{{name}} version {{version}}" }, version: "1.2.3" /* … */ })
-// "atlas version 1.2.3"
-```
-
-### `sortByDependencies(entries)`
-
-```ts
-sortByDependencies([
-	["npm", { dependsOn: ["node"] /* … */ }],
-	["node", {/* … */}],
-])
-// [["node", …], ["npm", …]]
-```
-
-- Walks `dependsOn` depth-first.
-- Names not present in the input set are ignored.
-- Cycles: `console.warn("Circular dependency detected involving: <name>")`, then both nodes still appear once.
-
-### `parseOsTarget(value)`
-
-```ts
-parseOsTarget("macos") // "macos"
-parseOsTarget("freebsd") // throws Error("Unknown OS target: freebsd. Expected one of: …")
-```
-
-### `detectOsFromPlatform(platform, override?)`
-
-```ts
-detectOsFromPlatform("darwin") // "macos"
-detectOsFromPlatform("win32") // "windows"
-detectOsFromPlatform("linux", "linux-dnf") // "linux-dnf"
-detectOsFromPlatform("linux") // linux-apt / linux-dnf / linux-pacman / linux-apt default
-```
-
-### `detectOs(override?)`
-
-`detectOsFromPlatform(process.platform, override ?? process.env.WORKERSTACK_SYSTEM_OS)`.
-
-### `commandLookup(command, platform = process.platform)`
-
-```ts
-commandLookup("bun", "win32") // "where bun >nul 2>&1"
-commandLookup("bun", "linux") // "command -v bun >/dev/null 2>&1"
-commandLookup("bun", "darwin") // "command -v bun >/dev/null 2>&1"
-```
-
-### `commandExists(command)`
-
-`true` if the (optionally quoted) path exists on disk, or if `commandLookup` succeeds.
-
-```ts
-commandExists("sh") // true on Unix
-commandExists("/usr/local/bin/node")
-commandExists('"/usr/local/bin/node"')
-commandExists("system-not-real") // false
-```
-
-### `versionsMatch(installed, expected)`
-
-```ts
-versionsMatch("24.19.0", "24.19.0") // true
-versionsMatch("1.0.1", "v1.0.1-canary") // true
-versionsMatch("25.5.0", "24.19.0") // false
-versionsMatch("1.3.11", "latest") // true
-```
-
-### `whichBinary(command, platform?)`
-
-```ts
-whichBinary("sh") // "/usr/bin/sh"
-whichBinary("system-not-real") // null
-```
-
-## Worked examples
-
-### Optional dep
-
-```ts
-jq: {
-	description: "JSON processor",
-	required: false,
-	version: "1.8.1",
-	os: {
-		macos: "brew install jq",
-		"linux-apt": "sudo apt-get install -y jq",
-		windows: "choco install jq --version={{version}}",
-	},
-}
-```
-
-If the command fails, `install` continues. `check` reports a mismatch, exit 0. `check jq` with jq missing still exits 1.
-
-### Custom check command
-
-```ts
-atlas: {
-	description: "Database schema management tool",
-	required: true,
-	version: "v1.0.1-1c2aa24-canary",
-	check: { command: "atlas version" },
-	os: {
-		all: "curl -sSf https://atlasgo.sh | sh -s -- --version {{version}}",
-		windows:
-			'New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\\bin" | Out-Null; Invoke-WebRequest -UseBasicParsing https://release.ariga.io/atlas/atlas-windows-amd64-latest.exe -OutFile "$env:LOCALAPPDATA\\bin\\atlas.exe"',
-	},
-}
-```
-
-Default `atlas --version` would be wrong. `check.command` must still print a `digits.digits` token or install will never skip.
-
-### `dependsOn`
-
-```ts
-node: { /* … */ version: "22.12.0", os: { all: "…" } },
-npm: {
-	description: "npm CLI",
-	required: true,
-	version: "10.9.0",
-	dependsOn: ["node"],
-	os: { all: "npm install -g npm@{{version}}" },
-},
-claude: {
-	description: "Claude Code CLI",
-	required: true,
-	version: "latest",
-	dependsOn: ["npm"],
-	os: { all: "npm install -g @anthropic-ai/claude-code@{{version}}" },
-},
-```
-
-`system install` order: `node` → `npm` → `claude`.
-
-`system install claude` runs only the claude command. Install `node` and `npm` first, or run the full `install`.
-
-### `version: "latest"`
-
-```ts
-claude: {
-	description: "Claude Code CLI",
-	required: true,
-	version: "latest",
-	os: { all: "npm install -g @anthropic-ai/claude-code@{{version}}" },
-}
-```
-
-- Install command becomes `…@latest`.
-- If any version is already detected, install skips (will not refresh to a newer latest).
-- `check` counts any detected version as OK.
-- If this were `bun`, `sync-pm` would skip.
-
-### Env detect + PATH append
-
-```ts
-"android-sdk": {
-	description: "Android SDK",
-	required: true,
-	version: "35.0.0",
-	check: { command: "adb --version" },
-	os: { macos: "brew install --cask android-commandlinetools" },
-	env: [
-		{
-			key: "ANDROID_HOME",
-			detect: ["$HOME/Library/Android/sdk", "$HOME/Android/sdk"],
-			fallback: "$HOME/Library/Android/sdk",
-		},
-		{ key: "PATH", appendToPath: true, value: "$ANDROID_HOME/platform-tools" },
-	],
-}
-```
-
-```bash
-bunx system env
-# writes ~/.zshrc or ~/.bashrc
-source ~/.zshrc
-```
-
-### Unavailable on one OS
-
-```ts
-flux: {
-	description: "InfluxDB CLI",
-	required: false,
-	version: "2.7.11",
-	os: {
-		macos: "brew install influxdb",
-		windows: 'Invoke-WebRequest … -OutFile "$env:LOCALAPPDATA\\bin\\flux.exe"',
-		"linux-apt": false,
-		"linux-dnf": false,
-		"linux-pacman": false,
-	},
-}
-```
-
-On Ubuntu: `flux@2.7.11 — not available on linux-apt`. Install and check succeed.
-
-### Dry-run on another OS command set
-
-```bash
-bunx system install --os windows --dry-run
-```
-
-Prints the Windows command strings. Does not run them. Does not write env. Does not skip already-installed deps.
-
-### Named export and custom config path
-
-```ts
-// tooling/system-deps.ts
-import { defineConfig } from "@workerstack/system"
-export const systemDeps = defineConfig({
-	packageJsonPath: "../package.json",
-	deps: { bun: {/* … */} },
-})
-```
-
-```bash
-bunx system install --config ./tooling/system-deps.ts
-```
-
-`sync-pm` will edit `tooling/../package.json`.
-
-### Library-only use (no CLI)
-
 ```ts
 import {
+	BUILTINS,
+	BUILTIN_GROUPS,
+	BUILTIN_NAMES, // the catalog
+	resolveDeps, // entries → full SystemDepConfig for { arch, os }
+	validateConfig, // throws ConfigError listing every problem
 	defineConfig,
-	detectOs,
-	interpolate,
-	resolveCheckCommand,
 	resolveOsCommand,
-	sortByDependencies,
+	resolveCheckCommand,
+	interpolate,
+	sortByDependencies, // install order; throws on cycles and unknown names
+	versionsMatch,
+	parseVersion,
+	detectOs,
+	detectOsFromPlatform,
+	detectLinuxDistro,
+	parseOsTarget,
+	OS_TARGETS,
+	whichBinary,
+	commandExists,
+	ConfigError,
 } from "@workerstack/system"
 
-const config = defineConfig({
-	deps: {
-		jq: {
-			description: "JSON processor",
-			required: false,
-			version: "1.8.1",
-			os: { all: "brew install jq" },
-		},
-	},
-})
-
-const os = detectOs()
-const command = resolveOsCommand("jq", config.deps.jq, os)
-const check = resolveCheckCommand("jq", config.deps.jq)
-const order = sortByDependencies(Object.entries(config.deps))
+const deps = resolveDeps(config.deps, { arch: process.arch, os: detectOs() }, BUILTINS)
+resolveOsCommand("go", deps.go!, "macos")
+// tmp="$(mktemp -d)" && curl -fsSL "https://go.dev/dl/go1.27.2.darwin-arm64.tar.gz" ...
 ```
 
-## package.json integration
-
-```json
-{
-	"scripts": {
-		"setup:deps": "system install",
-		"setup:deps:upgrade": "system install --upgrade",
-		"setup:deps:check": "system check",
-		"setup:deps:env": "system env",
-		"setup:deps:sync-pm": "system sync-pm"
-	}
-}
-```
-
-Onboarding:
-
-```bash
-npm install          # or bun install
-npm run setup:deps
-npm run setup:deps:env
-npm run setup:deps:sync-pm
-```
-
-`sync-pm` keeps Corepack / package-manager pinning aligned with `deps.bun.version`.
+Types: `SystemConfig`, `DepEntry`, `SystemDepConfig`, `OsCommands`, `OsTarget`, `EnvVar`, `BuiltinDep`, `BuiltinOverride`, `BuiltinName`, `RecipeContext`, `Arch`, `RawEntry`.
 
 ## Gotchas
 
-| Trap                                            | What actually happens                                                                                                                                                                                 |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `install <name>` of a dep with `dependsOn`      | Dependents are **not** installed.                                                                                                                                                                     |
-| Tool already installed at the wrong version     | `install` skips. `install --upgrade` re-runs the command. If PATH still shows the old binary (brew/nvm/fnm), that is a shadow warning, not a failed install.                                          |
-| Agent/IDE PATH vs a new terminal                | `check` uses an interactive TTY PATH snapshot with a keep-list spawn env (stock PATH, no leftover toolchain exports). `check --here` uses this process PATH. `install` always uses this process PATH. |
-| `--dry-run` to "see what would skip"            | Dry-run never checks installed versions. Everything with a command is "installed".                                                                                                                    |
-| Check command that prints no `N.N`              | Treated as not installed. Install will run every time.                                                                                                                                                |
-| `check <optional-dep>` when missing             | Exit 1. `required: false` only changes all-deps `install` / `check`.                                                                                                                                  |
-| `{{arch}}` on `x64`                             | `amd64`, not `x64`.                                                                                                                                                                                   |
-| Linux without apt/dnf/pacman                    | Detected as `linux-apt`.                                                                                                                                                                              |
-| `os.windows` uses `\|\|` plus `$env:`           | Routed to PowerShell; `\|\|` is wrong. Keep cmd syntax and PowerShell syntax in separate commands.                                                                                                    |
-| `env.detect` writes the resolved path           | No. It writes the template (`$HOME/...`).                                                                                                                                                             |
-| Extra env tokens in `detect` (`$XDG_DATA_HOME`) | Not expanded. Existence check looks for a literal `$XDG_DATA_HOME/…` path.                                                                                                                            |
-| `sync-pm` for node                              | Not implemented. Only `deps.bun`.                                                                                                                                                                     |
-| `packageJsonPath` relative to cwd               | No. Relative to the config file directory.                                                                                                                                                            |
-| Import `@workerstack/system/env`                | Not exported. Use the CLI or copy the idea.                                                                                                                                                           |
-| JSON config                                     | Not supported.                                                                                                                                                                                        |
-| Walking parent dirs for config                  | Not supported. Run from the directory that contains the file, or pass `--config`.                                                                                                                     |
-
-## Releases
-
-GitHub Releases match npm versions. Pushing a tag `vX.Y.Z` (same as this `package.json` `version`) runs the repo [`.github/workflows/release.yml`](https://github.com/workerstack/system/blob/main/.github/workflows/release.yml): test, `npm publish` via trusted publishing, GitHub Packages, then a GitHub Release.
-
-Configure the trusted publisher once on this package (Settings → Trusted Publisher → GitHub Actions): repository `workerstack/system`, workflow `release.yml`, no environment, allow npm publish. Do not put an npm token in GitHub secrets.
+- `choco` and the Windows `choco install` recipes need an admin shell.
+- `docker` on Linux adds you to the `docker` group. Log out and back in before using it without sudo.
+- `playwright` installs OS libraries only on apt (`--with-deps`); on dnf, pacman, macOS and Windows it installs the browser alone.
+- `claude` and `grok` update themselves. Pin them only when you need a fixed version, and set `DISABLE_AUTOUPDATER=1` for claude.
+- `chromium` is Linux-only, and on Ubuntu apt hands it to snap.
+- A new terminal (or `source` of the rc file) picks up PATH changes; `system check` already reads a new shell's PATH.
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md).
+[CHANGELOG.md](./CHANGELOG.md)
 
 ## License
 

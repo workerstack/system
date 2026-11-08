@@ -92,14 +92,16 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run test:e2e:docker
 
+  # every built-in really installs, then check must report the pinned version
   catalog-install:
-    name: catalog install
+    name: catalog install (${{ matrix.os }}, ${{ matrix.group }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        group: [runtimes, languages, release, cloudflare, database, browsers, agents]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -109,7 +111,28 @@ jobs:
       - name: Allow Chocolatey confirmation
         if: runner.os == 'Windows'
         run: choco feature enable -n allowGlobalConfirmation
-      - name: Install the example catalog
-        run: bun e2e/catalog-install.ts
+      - name: Install the ${{ matrix.group }} group
+        run: bun e2e/catalog-install.ts --group ${{ matrix.group }}
         env:
-          WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS: "600000"
+          WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS: "900000"
+
+  # the same installs on dnf and pacman, which no hosted runner provides
+  catalog-install-linux:
+    name: catalog install (${{ matrix.distro }}, ${{ matrix.group }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [dnf, pacman]
+        group: [runtimes, languages, release, cloudflare, database, browsers, agents]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the ${{ matrix.distro }} image
+        run: docker build -f e2e/docker/linux-${{ matrix.distro }}.Dockerfile -t system-${{ matrix.distro }} .
+      - name: Install the ${{ matrix.group }} group
+        run: >
+          docker run --rm -v "$PWD:/src" -w /src -e SHELL=/bin/bash
+          -e WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS=900000
+          system-${{ matrix.distro }}
+          bash -c "bun install --frozen-lockfile && bun e2e/catalog-install.ts --group ${{ matrix.group }}"

@@ -6,7 +6,7 @@
 import { execSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { dirname } from "node:path"
+import { delimiter, dirname } from "node:path"
 import { pathToFileURL } from "node:url"
 import { runShellCommand } from "./exec.ts"
 import { type PathSnapshot, pathEnv, snapshotTtyPath } from "./path.ts"
@@ -22,6 +22,8 @@ export interface CaptureResult {
 export interface RuntimeOptions {
 	/** Kill a check command after this long. Default 30s, so a hanging `--version` cannot hang a run. */
 	checkTimeoutMs?: number
+	/** The environment commands run in and PATH changes go to. Default `process.env`. */
+	env?: NodeJS.ProcessEnv
 }
 
 export interface Runtime {
@@ -36,6 +38,8 @@ export interface Runtime {
 	exists(path: string): boolean
 	importModule(path: string): Promise<Record<string, unknown>>
 	log(line: string): void
+	/** Put `dir` first on this process's PATH (once), so later commands in the run find what it holds. */
+	prependPath(dir: string): void
 	readFile(path: string): string
 	/** Run an install command with inherited stdio. True on exit 0. */
 	run(command: string): boolean
@@ -47,14 +51,14 @@ export interface Runtime {
 	writeFile(path: string, content: string): void
 }
 
-export function nodeRuntime({ checkTimeoutMs = 30_000 }: RuntimeOptions = {}): Runtime {
+export function nodeRuntime({ checkTimeoutMs = 30_000, env = process.env }: RuntimeOptions = {}): Runtime {
 	return {
 		arch: process.arch,
 		capture(command, searchPath) {
 			try {
 				const stdout = execSync(command, {
 					encoding: "utf-8",
-					env: searchPath === undefined ? process.env : pathEnv(searchPath),
+					env: searchPath === undefined ? env : pathEnv(searchPath, env),
 					stdio: ["pipe", "pipe", "pipe"],
 					timeout: checkTimeoutMs,
 				})
@@ -64,17 +68,21 @@ export function nodeRuntime({ checkTimeoutMs = 30_000 }: RuntimeOptions = {}): R
 			}
 		},
 		cwd: process.cwd(),
-		env: process.env,
+		env,
 		error: (line) => console.error(line),
 		exists: (path) => existsSync(path),
 		home: homedir(),
 		importModule: async (path) => (await import(pathToFileURL(path).href)) as Record<string, unknown>,
 		log: (line) => console.log(line),
 		platform: process.platform,
+		prependPath(dir) {
+			const parts = (env.PATH ?? "").split(delimiter).filter(Boolean)
+			if (!parts.includes(dir)) env.PATH = [dir, ...parts].join(delimiter)
+		},
 		readFile: (path) => readFileSync(path, "utf-8"),
 		run(command) {
 			try {
-				runShellCommand(command)
+				runShellCommand(command, process.platform, env)
 				return true
 			} catch {
 				return false

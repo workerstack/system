@@ -60,6 +60,26 @@ describe("install <name>", () => {
 	})
 })
 
+describe("install PATH", () => {
+	it("puts every dep's PATH dirs first on this run's PATH, so later installs find earlier ones", () => {
+		const ctx = context(
+			{
+				ruff: dep({ dependsOn: ["uv"], env: [{ path: "$HOME/.local/bin" }] }),
+				uv: dep({ env: [{ key: "UV", value: "1" }, { path: "/opt/uv/bin" }] }),
+			},
+			{ env: { PATH: "/usr/bin" }, home: "/home/me" },
+		)
+		installCommand(ctx, undefined, off)
+		expect(ctx.rt.prepended).toEqual(["/home/me/.local/bin", "/opt/uv/bin"])
+	})
+
+	it("does the same for a single install", () => {
+		const ctx = context({ go: dep({ env: [{ path: "$HOME/go/bin" }] }) }, { home: "/home/me" })
+		installCommand(ctx, "go", off)
+		expect(ctx.rt.prepended).toEqual(["/home/me/go/bin"])
+	})
+})
+
 describe("install (all)", () => {
 	it("installs in dependency order and summarizes", () => {
 		const ctx = context({

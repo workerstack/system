@@ -8,6 +8,9 @@
  *   {{arch}}    — CPU architecture: "arm64" or "amd64" (auto-detected)
  */
 
+import type { BuiltinName } from "./builtins/index.ts"
+import type { BuiltinOverride } from "./builtins/types.ts"
+
 export const OS_TARGETS = ["linux-apt", "linux-dnf", "linux-pacman", "macos", "windows"] as const
 
 export type OsTarget = (typeof OS_TARGETS)[number]
@@ -31,7 +34,7 @@ export type OsCommands = Partial<Record<OsTarget, string | false>> & { all?: str
 export type EnvVar =
 	| { path: string }
 	| { key: string; value: string }
-	| { detect: string[]; fallback?: string; key: string }
+	| { detect: readonly string[]; fallback?: string; key: string }
 
 export interface SystemDepConfig {
 	description: string
@@ -49,15 +52,23 @@ export interface SystemDepConfig {
 		pattern?: string
 	}
 	/** Deps that must be installed before this one (by dep key name) */
-	dependsOn?: string[]
+	dependsOn?: readonly string[]
 	/** Env vars to configure after install */
-	env?: EnvVar[]
+	env?: readonly EnvVar[]
 }
 
-export interface SystemConfig {
-	/** Path to package.json for packageManager sync. Relative to config file directory. */
+/**
+ * One `deps` entry. A built-in name takes its version (`go: "1.27.2"`) or an override object
+ * (`{ version, ...fields to replace, os merged per key }`); any other name is a full custom dep.
+ */
+export type DepEntry<K extends PropertyKey> = K extends BuiltinName ? BuiltinOverride | string : SystemDepConfig
+
+export interface SystemConfig<
+	D extends Record<string, unknown> = Record<string, BuiltinOverride | SystemDepConfig | string>,
+> {
+	deps: { [K in keyof D]: DepEntry<K> }
+	/** package.json whose `packageManager` follows the bun pin. Relative to the config file. */
 	packageJsonPath?: string
-	deps: Record<string, SystemDepConfig>
 }
 
 /** `{{arch}}` value: "arm64" on arm64, "amd64" everywhere else. */
@@ -102,14 +113,11 @@ export function resolveCheckCommand(name: string, config: SystemDepConfig): stri
 }
 
 /**
- * Helper to define system dependencies configuration with type safety
+ * Type a `system.config.ts` default export. Each key is checked on its own: a built-in name takes a
+ * version string or override object, any other name a full `SystemDepConfig`.
  */
-export function defineConfig(options: {
-	packageJsonPath?: string
-	deps: Record<string, SystemDepConfig>
-}): SystemConfig {
-	return {
-		deps: options.deps,
-		packageJsonPath: options.packageJsonPath ?? "package.json",
-	}
+export function defineConfig<const D extends Record<string, unknown>>(
+	config: SystemConfig<D> & { deps: D },
+): { deps: D; packageJsonPath?: string } {
+	return config
 }

@@ -19,12 +19,14 @@ function strip(version: string): string {
  * - `latest` matches anything.
  * - Plain versions match when expected's dot segments prefix installed's: `22` matches `22.20.0`,
  *   `1.27.1` matches `1.27.1` and `1.27.1.4`, but never `1.27.10`.
- * - A prerelease or build tag (`-beta.12`, `+7`) on either side must match exactly.
+ * - Build metadata (`+9`, and anything after it) on the installed side is ignored unless the pin has some,
+ *   as in semver: `21` matches Temurin's `21.0.13+9`. A pin with `+` matches exactly.
+ * - A prerelease (`-beta.12`) on either side must match exactly.
  */
 export function versionsMatch(installed: string, expected: string): boolean {
 	if (expected === "latest") return true
-	const have = strip(installed)
 	const want = strip(expected)
+	const have = want.includes("+") ? strip(installed) : (strip(installed).split("+")[0] as string)
 	if (/[-+]/.test(have) || /[-+]/.test(want)) return have === want
 	const haveParts = have.split(".")
 	return want.split(".").every((part, i) => haveParts[i] === part)

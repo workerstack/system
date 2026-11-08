@@ -74,10 +74,9 @@ describe("resolveCheckCommand", () => {
 })
 
 describe("defineConfig", () => {
-	it("defaults packageJsonPath to package.json", () => {
-		const config = defineConfig({ deps: { bun: dep() } })
-		expect(config.packageJsonPath).toBe("package.json")
-		expect(config.deps.bun?.version).toBe("1.2.3")
+	it("returns the config as written (main defaults packageJsonPath)", () => {
+		const input = { deps: { bun: "1.4.4", mine: dep() } }
+		expect(defineConfig(input)).toBe(input)
 	})
 
 	it("keeps an explicit packageJsonPath", () => {

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Built-in catalog of 36 tools a workerstack repo needs: bun, node, deno; go, rust, python, uv, ruff, mypy, dotnet, java, gradle, google-java-format (every language the generated clients target); git, gh, jq, curl, goreleaser, cosign, shellcheck, pwsh; cf, cloudflared; atlas, sqld; docker, chromium, lightpanda, playwright; claude, codex, grok, rtk, ffmpeg; brew and choco. Give a version (`go: "1.27.2"`) and the catalog supplies per-OS, per-CPU install commands, the check, PATH entries and prerequisites. An object form overrides fields, with `os` merged per key
+- Version policy per built-in (exact pin, `latest` only, or either), and prerequisites: brew and choco are added when needed, any other missing one is an error naming the fix
+- `defineConfig` types each key: a version string only for built-in names, the full form for custom deps
+- `system list` prints the catalog
+- `install` puts every dep's PATH dirs first on its own PATH, so a dep finds a prerequisite installed earlier in the same run
+- Windows env blocks go into both the PowerShell 7 and Windows PowerShell 5.1 profiles; `check` snapshots PATH through the 5.1 one
+- Java versions match with build metadata ignored unless pinned: `java: "21"` matches `21.0.13+9`
+
 ### Breaking
 
 - `env` entries are `{ path }`, `{ key, value }` or `{ key, detect, fallback? }`. `appendToPath` is gone: `{ path: "<dir>" }` puts the directory first on PATH, so the pinned binary wins over one already installed. A config still using `appendToPath` fails with the replacement spelled out

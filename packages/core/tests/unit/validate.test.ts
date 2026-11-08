@@ -14,6 +14,37 @@ function errors(config: unknown): string[] {
 	}
 }
 
+describe("validateConfig built-in entries", () => {
+	const builtins = new Set(["go", "uv"])
+	const check = (deps: unknown) => {
+		try {
+			validateConfig({ deps }, builtins)
+			return []
+		} catch (error) {
+			return (error as Error).message.split("\n").slice(1)
+		}
+	}
+
+	it("accepts a version string and an override object", () => {
+		expect(check({ go: "1.27.2", uv: { os: { macos: false }, required: false, version: "0.13.1" } })).toEqual([])
+		expect(check({ go: { os: {}, version: "1.27.2" } })).toEqual([])
+	})
+
+	it("rejects an empty version, a missing version, unknown keys, and bad override fields", () => {
+		expect(check({ go: "" })).toEqual(["  - deps.go: must be a version string or { version, ... }"])
+		expect(check({ go: 1 })).toEqual(["  - deps.go: must be a version string or { version, ... }"])
+		expect(check({ go: { os: { beos: "x" }, required: 1, verison: "1" } })).toEqual([
+			"  - deps.go.version: must be a non-empty string",
+			"  - deps.go.required: must be true or false",
+			"  - deps.go.os.beos: unknown OS (allowed: all, linux-apt, linux-dnf, linux-pacman, macos, windows)",
+			"  - deps.go.verison: unknown key (allowed: check, dependsOn, description, env, os, required, version)",
+		])
+		expect(check({ go: { description: "", version: "1" } })).toEqual([
+			"  - deps.go.description: must be a non-empty string",
+		])
+	})
+})
+
 describe("validateConfig", () => {
 	it("accepts a full valid config and returns it typed", () => {
 		const config = {

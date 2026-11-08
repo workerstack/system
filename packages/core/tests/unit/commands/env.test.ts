@@ -37,7 +37,7 @@ describe("configureEnvVars", () => {
 		expect(rc.startsWith("keep\n")).toBe(true)
 		expect(rc).toContain('export A="2"')
 		expect(rc).not.toContain('export A="1"')
-		expect(rt.logs).toContain("   Updating existing go environment config...")
+		expect(rt.logs).toContain("   Updating existing go environment config in .bashrc...")
 	})
 
 	it("detects the first existing path, else the fallback, else nothing", () => {
@@ -83,12 +83,12 @@ describe("configureEnvVars", () => {
 		expect(rt.errors).toContain("   Failed to configure env vars: disk full")
 	})
 
-	it("writes the PowerShell profile on Windows", () => {
+	it("writes both PowerShell profiles on Windows", () => {
 		const rt = fakeRuntime({ home: "C:\\Users\\me", platform: "win32" })
 		configureEnvVars(rt, "go", [{ key: "A", value: "1" }])
-		const [path, content] = [...rt.files.entries()][0] as [string, string]
-		expect(path).toContain("Microsoft.PowerShell_profile.ps1")
-		expect(content).toContain('$env:A = "1"')
+		const written = [...rt.files.entries()]
+		expect(written.map(([path]) => path.includes("WindowsPowerShell"))).toEqual([false, true])
+		for (const [, content] of written) expect(content).toContain('$env:A = "1"')
 	})
 })
 
