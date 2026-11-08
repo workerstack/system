@@ -77,9 +77,9 @@ describe("check <name>", () => {
 	})
 
 	it("warns once when the TTY snapshot falls back to this process", () => {
-		const ctx = context({ go: dep() }, { ...found, tty: { path: "/p", source: "process" } })
+		const ctx = context({ go: dep() }, { ...found, tty: { path: "/p", reason: "spawn ENOENT", source: "process" } })
 		checkCommand(ctx, "go", false)
-		expect(ctx.rt.warnings).toEqual([TTY_PATH_FALLBACK_WARN])
+		expect(ctx.rt.warnings).toEqual([`${TTY_PATH_FALLBACK_WARN} (spawn ENOENT)`])
 	})
 })
 
