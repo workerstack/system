@@ -17,8 +17,8 @@ export default defineConfig({
 					fallback: "$HOME/Android/sdk",
 					key: "ANDROID_HOME",
 				},
-				{ appendToPath: true, key: "PATH", value: "$ANDROID_HOME/emulator" },
-				{ appendToPath: true, key: "PATH", value: "$ANDROID_HOME/platform-tools" },
+				{ path: "$ANDROID_HOME/emulator" },
+				{ path: "$ANDROID_HOME/platform-tools" },
 			],
 			os: {
 				"linux-apt": `
@@ -141,7 +141,7 @@ fi`,
 					fallback: "$HOME/.deno",
 					key: "DENO_INSTALL",
 				},
-				{ appendToPath: true, key: "PATH", value: "$HOME/.deno/bin" },
+				{ path: "$HOME/.deno/bin" },
 			],
 			os: {
 				"linux-apt": 'curl -fsSL https://deno.land/install.sh | sh -s "v{{version}}"',
@@ -347,7 +347,7 @@ fi`,
 					fallback: "$HOME/.rustup",
 					key: "RUSTUP_HOME",
 				},
-				{ appendToPath: true, key: "PATH", value: "$HOME/.cargo/bin" },
+				{ path: "$HOME/.cargo/bin" },
 			],
 			os: {
 				"linux-apt":

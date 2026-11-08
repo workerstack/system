@@ -5,6 +5,7 @@
 import { resolve } from "node:path"
 import type { SystemConfig } from "./config.ts"
 import type { Runtime } from "./runtime.ts"
+import { validateConfig } from "./validate.ts"
 
 export const CONFIG_NAMES = ["system.config.ts", "system.config.js", "system.config.mjs"] as const
 
@@ -23,15 +24,19 @@ export function findConfig(rt: Runtime, explicit: string | undefined): Result<st
 	return { error: `No system config found. Create one of: ${CONFIG_NAMES.join(", ")}`, ok: false }
 }
 
-function hasDeps(value: unknown): value is SystemConfig {
+function hasDeps(value: unknown): value is { deps: unknown } {
 	return typeof value === "object" && value !== null && "deps" in value
 }
 
-/** `export default defineConfig(...)`, else the first named export holding `deps`. */
+/**
+ * `export default defineConfig(...)`, else the first named export holding `deps`, validated.
+ * Throws `ConfigError` listing every problem in the config's shape.
+ */
 export async function importConfig(rt: Runtime, path: string): Promise<Result<SystemConfig>> {
 	const mod = await rt.importModule(path)
-	if (hasDeps(mod.default)) return { ok: true, value: mod.default }
-	const named = Object.values(mod).find(hasDeps)
-	if (named) return { ok: true, value: named }
-	return { error: "Config file must export an object with a `deps` field (use defineConfig)", ok: false }
+	const config = hasDeps(mod.default) ? mod.default : Object.values(mod).find(hasDeps)
+	if (config === undefined) {
+		return { error: "Config file must export an object with a `deps` field (use defineConfig)", ok: false }
+	}
+	return { ok: true, value: validateConfig(config) }
 }

@@ -15,6 +15,13 @@ import { whichBinary } from "./platform.ts"
 export interface CaptureResult {
 	ok: boolean
 	stdout: string
+	/** the command was killed after the check timeout */
+	timedOut: boolean
+}
+
+export interface RuntimeOptions {
+	/** Kill a check command after this long. Default 30s, so a hanging `--version` cannot hang a run. */
+	checkTimeoutMs?: number
 }
 
 export interface Runtime {
@@ -40,7 +47,7 @@ export interface Runtime {
 	writeFile(path: string, content: string): void
 }
 
-export function nodeRuntime(): Runtime {
+export function nodeRuntime({ checkTimeoutMs = 30_000 }: RuntimeOptions = {}): Runtime {
 	return {
 		arch: process.arch,
 		capture(command, searchPath) {
@@ -49,10 +56,11 @@ export function nodeRuntime(): Runtime {
 					encoding: "utf-8",
 					env: searchPath === undefined ? process.env : pathEnv(searchPath),
 					stdio: ["pipe", "pipe", "pipe"],
+					timeout: checkTimeoutMs,
 				})
-				return { ok: true, stdout: stdout.trim() }
-			} catch {
-				return { ok: false, stdout: "" }
+				return { ok: true, stdout: stdout.trim(), timedOut: false }
+			} catch (error) {
+				return { ok: false, stdout: "", timedOut: (error as { code?: string }).code === "ETIMEDOUT" }
 			}
 		},
 		cwd: process.cwd(),

@@ -17,13 +17,18 @@ describe("nodeRuntime", () => {
 	})
 
 	it("captures trimmed stdout, and fails on a non-zero exit", () => {
-		expect(rt.capture(`${node} -e "console.log(' 1.2.3 ')"`)).toEqual({ ok: true, stdout: "1.2.3" })
-		expect(rt.capture(`${node} -e "process.exit(3)"`)).toEqual({ ok: false, stdout: "" })
+		expect(rt.capture(`${node} -e "console.log(' 1.2.3 ')"`)).toEqual({ ok: true, stdout: "1.2.3", timedOut: false })
+		expect(rt.capture(`${node} -e "process.exit(3)"`)).toEqual({ ok: false, stdout: "", timedOut: false })
+	})
+
+	it("kills a check that outlives the timeout and reports it", () => {
+		const slow = nodeRuntime({ checkTimeoutMs: 200 })
+		expect(slow.capture(`${node} -e "setTimeout(() => {}, 10000)"`)).toEqual({ ok: false, stdout: "", timedOut: true })
 	})
 
 	it("captures with a replaced PATH", () => {
 		const out = rt.capture(`${node} -e "console.log(process.env.PATH)"`, `/only/here`)
-		expect(out).toEqual({ ok: true, stdout: "/only/here" })
+		expect(out).toEqual({ ok: true, stdout: "/only/here", timedOut: false })
 	})
 
 	it("runs a command and reports its exit status", () => {

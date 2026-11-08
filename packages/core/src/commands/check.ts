@@ -1,5 +1,6 @@
 import { resolve } from "node:path"
-import { resolveOsCommand, versionsMatch } from "../config.ts"
+import { resolveOsCommand } from "../config.ts"
+import { versionsMatch } from "../version.ts"
 import { TTY_PATH_FALLBACK_WARN } from "../path.ts"
 import { type Context, probeInstalled } from "../probe.ts"
 import type { Runtime } from "../runtime.ts"

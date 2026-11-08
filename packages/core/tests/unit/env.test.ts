@@ -3,68 +3,82 @@ import { describe, expect, it } from "vitest"
 import { applyEnvBlock, expandPath, reloadHint, renderEnvBlock, shellConfigPath, shellKind } from "../../src/env.ts"
 
 describe("shellKind", () => {
-	it("uses PowerShell on Windows", () => {
+	it("uses PowerShell on Windows whatever SHELL says", () => {
 		expect(shellKind("win32")).toBe("powershell")
+		expect(shellKind("win32", "/usr/bin/fish")).toBe("powershell")
 	})
 
-	it("uses posix on macOS and Linux", () => {
-		expect(shellKind("darwin")).toBe("posix")
+	it("uses fish for a fish SHELL and posix otherwise", () => {
+		expect(shellKind("linux", "/usr/bin/fish")).toBe("fish")
+		expect(shellKind("darwin", "/opt/homebrew/bin/fish")).toBe("fish")
+		expect(shellKind("linux", "/bin/zsh")).toBe("posix")
 		expect(shellKind("linux")).toBe("posix")
 	})
 })
 
 describe("shellConfigPath", () => {
+	const home = join("home", "me")
+
 	it("writes the PowerShell 7 profile on Windows", () => {
-		const home = join("Users", "me")
 		expect(shellConfigPath(home, "powershell")).toBe(
 			resolve(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1"),
 		)
 	})
 
-	it("writes .zshrc for zsh", () => {
-		const home = join("home", "me")
+	it("writes .zshrc for zsh and .bashrc otherwise", () => {
 		expect(shellConfigPath(home, "posix", "/bin/zsh")).toBe(resolve(home, ".zshrc"))
+		expect(shellConfigPath(home, "posix", "/bin/bash")).toBe(resolve(home, ".bashrc"))
 	})
 
-	it("writes .bashrc otherwise", () => {
-		const home = join("home", "me")
-		expect(shellConfigPath(home, "posix", "/bin/bash")).toBe(resolve(home, ".bashrc"))
+	it("writes a fish conf.d file, under XDG_CONFIG_HOME when set", () => {
+		expect(shellConfigPath(home, "fish")).toBe(resolve(home, ".config", "fish", "conf.d", "workerstack-system.fish"))
+		expect(shellConfigPath(home, "fish", "/usr/bin/fish", { XDG_CONFIG_HOME: "/xdg" })).toBe(
+			resolve("/xdg", "fish", "conf.d", "workerstack-system.fish"),
+		)
 	})
 })
 
 describe("expandPath", () => {
-	it("expands unix and Windows home tokens", () => {
+	it("expands HOME and USERPROFILE to the given home in every syntax", () => {
 		expect(expandPath("$HOME/tool", "/home/me")).toBe("/home/me/tool")
+		expect(expandPath("${HOME}/tool", "/home/me")).toBe("/home/me/tool")
 		expect(expandPath("%USERPROFILE%\\tool", "C:\\Users\\me")).toBe("C:\\Users\\me\\tool")
+		expect(expandPath("%home%\\tool", "C:\\Users\\me")).toBe("C:\\Users\\me\\tool")
 	})
 
-	it("expands ANDROID_HOME from either syntax", () => {
-		const env = { ANDROID_HOME: "/sdk" }
-		expect(expandPath("$ANDROID_HOME/platform-tools", "/home/me", env)).toBe("/sdk/platform-tools")
-		expect(expandPath("%ANDROID_HOME%\\platform-tools", "C:\\Users\\me", env)).toBe("/sdk\\platform-tools")
+	it("expands any variable from env and leaves unknown ones literal", () => {
+		const env = { ANDROID_HOME: "/sdk", GOPATH: "/go" }
+		expect(expandPath("$ANDROID_HOME/platform-tools", "/h", env)).toBe("/sdk/platform-tools")
+		expect(expandPath("%ANDROID_HOME%\\platform-tools", "/h", env)).toBe("/sdk\\platform-tools")
+		expect(expandPath("${GOPATH}/bin:$GOPATH", "/h", env)).toBe("/go/bin:/go")
+		expect(expandPath("$NOPE/x %NOPE% ${NOPE}", "/h", env)).toBe("$NOPE/x %NOPE% ${NOPE}")
 	})
 })
 
 describe("renderEnvBlock", () => {
-	const envs = [
-		{ key: "TOOL_HOME", value: "$HOME/tool" },
-		{ appendToPath: true, key: "PATH", value: "$HOME/tool/bin" },
-	]
+	const envs = [{ key: "TOOL_HOME", value: "$HOME/tool" }, { path: "$HOME/tool/bin" }]
 
-	it("emits bash exports", () => {
+	it("emits bash exports with PATH entries first", () => {
 		const block = renderEnvBlock("tool", envs, "posix")
 		expect(block).toContain("# tool environment (managed by @workerstack/system)")
 		expect(block).toContain('export TOOL_HOME="$HOME/tool"')
-		expect(block).toContain('export PATH="$PATH:$HOME/tool/bin"')
+		expect(block).toContain('export PATH="$HOME/tool/bin:$PATH"')
 		expect(block).toContain("# end tool environment")
 		expect(block).not.toContain("\r\n")
 	})
 
-	it("emits PowerShell assignments", () => {
+	it("emits PowerShell assignments with PATH entries first", () => {
 		const block = renderEnvBlock("tool", envs, "powershell")
 		expect(block).toContain('$env:TOOL_HOME = "$HOME/tool"')
-		expect(block).toContain('$env:Path += ";$HOME/tool/bin"')
+		expect(block).toContain('$env:Path = "$HOME/tool/bin;" + $env:Path')
 		expect(block).toContain("\r\n")
+	})
+
+	it("emits fish set -gx with PATH entries first", () => {
+		const block = renderEnvBlock("tool", envs, "fish")
+		expect(block).toContain('set -gx TOOL_HOME "$HOME/tool"')
+		expect(block).toContain('set -gx PATH "$HOME/tool/bin" $PATH')
+		expect(block).not.toContain("\r\n")
 	})
 })
 
@@ -78,6 +92,12 @@ describe("applyEnvBlock", () => {
 		expect(next).not.toContain('export A="1"')
 	})
 
+	it("is idempotent", () => {
+		const block = renderEnvBlock("tool", [{ path: "/opt/tool" }], "posix")
+		const once = applyEnvBlock("keep\n", block, "tool")
+		expect(applyEnvBlock(once, block, "tool")).toBe(once)
+	})
+
 	it("replaces a legacy crossdeps block with one new block", () => {
 		const legacy = '\n# tool environment (managed by crossdeps)\nexport A="old"\n# end tool environment\n'
 		const block = renderEnvBlock("tool", [{ key: "A", value: "new" }], "posix")
@@ -88,10 +108,22 @@ describe("applyEnvBlock", () => {
 		expect(next).not.toContain('export A="old"')
 		expect(next.match(/managed by @workerstack\/system/g)).toHaveLength(1)
 	})
+
+	it("leaves other tools' blocks alone", () => {
+		const other = renderEnvBlock("other", [{ key: "B", value: "1" }], "posix")
+		const next = applyEnvBlock(other, renderEnvBlock("tool", [{ key: "A", value: "1" }], "posix"), "tool")
+		expect(next).toContain('export B="1"')
+	})
 })
 
 describe("reloadHint", () => {
-	it("tells Windows users to reload $PROFILE", () => {
-		expect(reloadHint("powershell", "Microsoft.PowerShell_profile.ps1")).toContain("$PROFILE")
+	it("names the file to source for each shell", () => {
+		expect(reloadHint("powershell", "C:\\p\\Microsoft.PowerShell_profile.ps1")).toBe(
+			"Restart PowerShell or run: . $PROFILE",
+		)
+		expect(reloadHint("posix", "/home/me/.zshrc")).toBe("Run: source ~/.zshrc   (or restart terminal)")
+		expect(reloadHint("fish", "/x/conf.d/workerstack-system.fish")).toBe(
+			"Run: source /x/conf.d/workerstack-system.fish   (or restart fish)",
+		)
 	})
 })

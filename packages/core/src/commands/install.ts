@@ -1,4 +1,5 @@
-import { resolveOsCommand, type SystemDepConfig, versionsMatch } from "../config.ts"
+import { resolveOsCommand, type SystemDepConfig } from "../config.ts"
+import { versionsMatch } from "../version.ts"
 import { sortByDependencies } from "../graph.ts"
 import { type Context, probeInstalled } from "../probe.ts"
 import { configureEnvVars } from "./env.ts"

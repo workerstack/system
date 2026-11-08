@@ -314,7 +314,7 @@ describe("CLI as a workspace consumer", () => {
 			description: "env fixture",
 			env: [
 				{ key: "TOOL_HOME", value: "$HOME/tool" },
-				{ appendToPath: true, key: "PATH", value: "$HOME/tool/bin" },
+				{ path: "$HOME/tool/bin" },
 			],
 			os: { all: ${JSON.stringify(bunLog("tool"))} },
 			required: true,
@@ -336,10 +336,10 @@ describe("CLI as a workspace consumer", () => {
 		expect(written).toContain("# tool environment (managed by @workerstack/system)")
 		if (process.platform === "win32") {
 			expect(written).toContain('$env:TOOL_HOME = "$HOME/tool"')
-			expect(written).toContain('$env:Path += ";$HOME/tool/bin"')
+			expect(written).toContain('$env:Path = "$HOME/tool/bin;" + $env:Path')
 		} else {
 			expect(written).toContain('export TOOL_HOME="$HOME/tool"')
-			expect(written).toContain('export PATH="$PATH:$HOME/tool/bin"')
+			expect(written).toContain('export PATH="$HOME/tool/bin:$PATH"')
 		}
 	})
 })
