@@ -53,6 +53,23 @@ describe("install <name>", () => {
 		expect(ctx.rt.logs).toContain("   PATH still has 1.1.0 (expected 1.2.3) /bin/go")
 	})
 
+	it("writes env vars for a dep it skips, so a new shell finds what is already installed", () => {
+		const ctx = context(
+			{ go: dep({ env: [{ path: "$HOME/go/bin" }] }) },
+			{ capture: { "go --version": "go 1.2.3" }, env: { SHELL: "/bin/bash" }, which: { go: "/opt/go" } },
+		)
+		expect(installCommand(ctx, "go", off)).toBe(0)
+		expect(ctx.rt.ran).toEqual([])
+		expect([...ctx.rt.files.values()].join("")).toContain('export PATH="$HOME/go/bin:$PATH"')
+
+		const stale = context(
+			{ go: dep({ env: [{ path: "$HOME/go/bin" }] }) },
+			{ capture: { "go --version": "go 1.0.0" }, env: { SHELL: "/bin/bash" }, which: { go: "/opt/go" } },
+		)
+		installCommand(stale, "go", off)
+		expect([...stale.rt.files.values()].join("")).toContain('export PATH="$HOME/go/bin:$PATH"')
+	})
+
 	it("configures env vars after a successful install", () => {
 		const ctx = context({ go: dep({ env: [{ key: "GOPATH", value: "$HOME/go" }] }) }, { env: { SHELL: "/bin/bash" } })
 		expect(installCommand(ctx, "go", off)).toBe(0)

@@ -6,6 +6,7 @@
  *
  *   bun e2e/catalog-install.ts --group languages
  */
+import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import {
@@ -68,9 +69,16 @@ async function cli(args: string[]): Promise<{ code: number; out: string; timedOu
 	return { code, out, timedOut }
 }
 
+/* the Fedora and Arch jobs run in containers, which have no systemd to run a daemon */
+const inContainer = existsSync("/.dockerenv") || existsSync("/run/.containerenv")
+const NEEDS_SERVICE_MANAGER = new Set(["docker"])
+
 async function tryOne(name: string): Promise<{ detail: string; outcome: Outcome }> {
 	const config = deps[name]!
 	if (resolveOsCommand(name, config, os) === null) return { detail: `not available on ${os}`, outcome: "unavailable" }
+	if (inContainer && NEEDS_SERVICE_MANAGER.has(name)) {
+		return { detail: "needs systemd, which a container lacks", outcome: "unavailable" }
+	}
 
 	const install = await cli(["install", name, "--upgrade"])
 	if (install.timedOut) return { detail: "install timed out", outcome: "timeout" }

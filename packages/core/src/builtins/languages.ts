@@ -62,6 +62,8 @@ export const LANGUAGES = {
 			const sh = `curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --version ${version} --install-dir "${LOCAL_SHARE}/dotnet" --no-path`
 			return {
 				...unix(sh, sh),
+				/* Fedora images lack the ICU library .NET needs at startup */
+				"linux-dnf": `sudo dnf install -y libicu && ${sh}`,
 				windows: ps(
 					'$s = Join-Path $env:TEMP "dotnet-install.ps1"',
 					"Invoke-WebRequest -UseBasicParsing https://dot.net/v1/dotnet-install.ps1 -OutFile $s",

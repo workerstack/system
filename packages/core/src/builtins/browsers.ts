@@ -2,7 +2,7 @@
  * Containers and browsers: docker, chromium, lightpanda, playwright.
  */
 
-import { binary, localBinEnv, pick } from "./recipes.ts"
+import { binary, LOCAL_BIN, localBinEnv, pick } from "./recipes.ts"
 import type { BuiltinDep } from "./types.ts"
 
 /**
@@ -17,9 +17,11 @@ const PLAYWRIGHT_CHECK =
 export const BROWSERS = {
 	chromium: {
 		description: "Chromium, the browser rail fallback (Linux only: brew and choco ship no usable build)",
+		env: localBinEnv,
 		os: () => ({
 			"linux-apt": "sudo apt-get install -y chromium || sudo snap install chromium",
-			"linux-dnf": "sudo dnf install -y chromium",
+			/* Fedora names the binary chromium-browser; link the name check and the browser rail use */
+			"linux-dnf": `sudo dnf install -y chromium && mkdir -p "${LOCAL_BIN}" && ln -sf /usr/bin/chromium-browser "${LOCAL_BIN}/chromium"`,
 			"linux-pacman": "sudo pacman -S --noconfirm chromium",
 			macos: false,
 			windows: false,

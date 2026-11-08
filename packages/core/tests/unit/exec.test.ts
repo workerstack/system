@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { needsPowerShell, runShellCommand, shellInvocation } from "../../src/exec.ts"
+import { needsPowerShell, runShellCommand, shellEnv, shellInvocation } from "../../src/exec.ts"
 
 describe("needsPowerShell", () => {
 	it("detects PowerShell-only syntax", () => {
@@ -33,6 +33,14 @@ describe("shellInvocation", () => {
 			verbatim: true,
 		})
 		expect(shellInvocation(command, "win32", {}).file).toBe("cmd.exe")
+	})
+})
+
+describe("shell env", () => {
+	it("drops PSModulePath for Windows PowerShell, so a pwsh 7 parent cannot break its module autoload", () => {
+		expect(shellEnv("powershell.exe", { PATH: "x", PSModulePath: "C:\\pwsh7\\Modules" })).toEqual({ PATH: "x" })
+		const env = { PATH: "x", PSModulePath: "m" }
+		expect(shellEnv("/bin/bash", env)).toBe(env)
 	})
 })
 

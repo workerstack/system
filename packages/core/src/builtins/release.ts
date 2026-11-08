@@ -100,11 +100,14 @@ export const RELEASE = {
 			const base = `${GH}/PowerShell/PowerShell/releases/download/v${version}`
 			const a = pick(arch, { arm64: "arm64", x64: "x64" })
 			const dir = "$HOME/.local/share/pwsh"
+			const linux = `${tree(`${base}/powershell-${version}-linux-${a}.tar.gz`, dir, { bins: ["pwsh"] })} && chmod +x "${dir}/pwsh"`
 			return {
 				...unix(
-					`${tree(`${base}/powershell-${version}-linux-${a}.tar.gz`, dir, { bins: ["pwsh"] })} && chmod +x "${dir}/pwsh"`,
+					linux,
 					`${tree(`${base}/powershell-${version}-osx-${a}.tar.gz`, dir, { bins: ["pwsh"] })} && chmod +x "${dir}/pwsh"`,
 				),
+				/* Fedora images lack the ICU library PowerShell needs at startup */
+				"linux-dnf": `sudo dnf install -y libicu && ${linux}`,
 				windows: winTree(`${base}/PowerShell-${version}-win-x64.zip`, "$env:LOCALAPPDATA\\Programs\\pwsh"),
 			}
 		},

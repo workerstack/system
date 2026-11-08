@@ -39,8 +39,12 @@ export function pathEnv(searchPath: string, base: NodeJS.ProcessEnv = process.en
 	return { ...base, PATH: searchPath, Path: searchPath }
 }
 
-/** HOME/USER/SHELL, locale, TERM, Windows profile roots. Not PATH. Not leftover toolchain exports. */
+/**
+ * HOME/USER/SHELL, locale, TERM, and the Windows profile and user-dir roots a profile expands
+ * (`$env:LOCALAPPDATA\bin`). Not PATH. Not leftover toolchain exports. Not PSModulePath.
+ */
 export const TTY_ENV_KEEP = [
+	"APPDATA",
 	"ComSpec",
 	"COMSPEC",
 	"HOME",
@@ -49,12 +53,20 @@ export const TTY_ENV_KEEP = [
 	"HOMESHARE",
 	"LANG",
 	"LANGUAGE",
+	"LOCALAPPDATA",
 	"LOGNAME",
 	"PATHEXT",
+	"ProgramData",
+	"PROGRAMDATA",
+	"ProgramFiles",
+	"PROGRAMFILES",
+	"ProgramFiles(x86)",
 	"SHELL",
 	"SYSTEMROOT",
 	"SystemRoot",
+	"TEMP",
 	"TERM",
+	"TMP",
 	"USER",
 	"USERPROFILE",
 	"WINDIR",
@@ -72,7 +84,8 @@ export function unixStockPath(): string {
 
 export function windowsStockPath(env: NodeJS.ProcessEnv): string {
 	const root = env.SYSTEMROOT || env.SystemRoot || "C:\\Windows"
-	return `${root}\\System32;${root}`
+	/* Windows PowerShell lives outside System32 proper, and the snapshot spawns it by name from this PATH */
+	return `${root}\\System32;${root};${root}\\System32\\WindowsPowerShell\\v1.0`
 }
 
 /** Env for the TTY PATH spawn. Interactive rc applies the default toolchain on a stock PATH. */
