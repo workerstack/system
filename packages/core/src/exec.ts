@@ -38,9 +38,13 @@ export function shellInvocation(
 }
 
 /** Run `command` with inherited stdio. Throws when the shell cannot start or exits non-zero. */
-export function runShellCommand(command: string, platform: NodeJS.Platform = process.platform): void {
-	const { args, file, verbatim } = shellInvocation(command, platform)
-	const result = spawnSync(file, args, { stdio: "inherit", windowsVerbatimArguments: verbatim })
+export function runShellCommand(
+	command: string,
+	platform: NodeJS.Platform = process.platform,
+	env: NodeJS.ProcessEnv = process.env,
+): void {
+	const { args, file, verbatim } = shellInvocation(command, platform, env)
+	const result = spawnSync(file, args, { env, stdio: "inherit", windowsVerbatimArguments: verbatim })
 	if (result.error) throw result.error
 	if (result.status !== 0) throw new Error(`exit ${result.status ?? result.signal}: ${command}`)
 }

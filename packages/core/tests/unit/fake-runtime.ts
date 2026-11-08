@@ -26,6 +26,7 @@ export interface FakeRuntime extends Runtime {
 	readonly errors: string[]
 	readonly files: Map<string, string>
 	readonly logs: string[]
+	readonly prepended: string[]
 	readonly ran: string[]
 	readonly warnings: string[]
 	/** logs, errors and warnings joined, for `toContain` assertions */
@@ -38,6 +39,8 @@ export function fakeRuntime(opts: FakeOptions = {}): FakeRuntime {
 	const errors: string[] = []
 	const warnings: string[] = []
 	const ran: string[] = []
+	const prepended: string[] = []
+	const env = opts.env ?? {}
 	const captured: Array<{ command: string; searchPath: string | undefined }> = []
 	const capture = { ...opts.capture }
 	const which = { ...opts.which }
@@ -52,7 +55,7 @@ export function fakeRuntime(opts: FakeOptions = {}): FakeRuntime {
 		},
 		captured,
 		cwd: opts.cwd ?? "/work",
-		env: opts.env ?? {},
+		env,
 		error: (line) => errors.push(line),
 		errors,
 		exists: (path) => files.has(path),
@@ -67,6 +70,11 @@ export function fakeRuntime(opts: FakeOptions = {}): FakeRuntime {
 		logs,
 		output: () => [...logs, ...errors, ...warnings].join("\n"),
 		platform: opts.platform ?? "linux",
+		prepended,
+		prependPath(dir) {
+			prepended.push(dir)
+			env.PATH = env.PATH ? `${dir}:${env.PATH}` : dir
+		},
 		ran,
 		readFile(path) {
 			const content = files.get(path)

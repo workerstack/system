@@ -15,23 +15,33 @@ export function shellKind(platform: NodeJS.Platform, shell = ""): ShellKind {
 	return basename(shell) === "fish" ? "fish" : "posix"
 }
 
-export function shellConfigPath(home: string, kind: ShellKind, shell = "", env: NodeJS.ProcessEnv = {}): string {
-	if (kind === "powershell") return resolve(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
-	if (kind === "fish") {
-		return resolve(env.XDG_CONFIG_HOME ?? resolve(home, ".config"), "fish", "conf.d", "workerstack-system.fish")
+/**
+ * The rc files the managed block goes into. On Windows both profiles: PowerShell 7 (`pwsh`) reads
+ * `Documents\PowerShell`, Windows PowerShell 5.1 (`powershell.exe`, which `check` snapshots) reads
+ * `Documents\WindowsPowerShell`.
+ */
+export function shellConfigPaths(home: string, kind: ShellKind, shell = "", env: NodeJS.ProcessEnv = {}): string[] {
+	if (kind === "powershell") {
+		return ["PowerShell", "WindowsPowerShell"].map((dir) =>
+			resolve(home, "Documents", dir, "Microsoft.PowerShell_profile.ps1"),
+		)
 	}
-	return resolve(home, shell.includes("zsh") ? ".zshrc" : ".bashrc")
+	if (kind === "fish") {
+		return [resolve(env.XDG_CONFIG_HOME ?? resolve(home, ".config"), "fish", "conf.d", "workerstack-system.fish")]
+	}
+	return [resolve(home, shell.includes("zsh") ? ".zshrc" : ".bashrc")]
 }
 
 /**
- * Expand `$VAR`, `${VAR}` and `%VAR%`. `HOME` and `USERPROFILE` are `home`; every other name comes from
+ * Expand `$env:VAR`, `$VAR`, `${VAR}` and `%VAR%`. `HOME` and `USERPROFILE` are `home`; every other name comes from
  * `env`. Names `env` does not define stay literal, so a later shell can still expand them.
  */
 export function expandPath(path: string, home: string, env: NodeJS.ProcessEnv = process.env): string {
 	const lookup = (name: string): string | undefined => (/^(home|userprofile)$/i.test(name) ? home : env[name])
 	return path.replace(
-		/\$\{(\w+)\}|\$(\w+)|%(\w+)%/g,
-		(token, braced?: string, bare?: string, percent?: string) => lookup((braced ?? bare ?? percent) as string) ?? token,
+		/\$env:(\w+)|\$\{(\w+)\}|\$(\w+)|%(\w+)%/g,
+		(token, ps?: string, braced?: string, bare?: string, percent?: string) =>
+			lookup((ps ?? braced ?? bare ?? percent) as string) ?? token,
 	)
 }
 

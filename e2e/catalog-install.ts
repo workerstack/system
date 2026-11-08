@@ -1,26 +1,48 @@
 #!/usr/bin/env bun
 /**
- * Try every dep in the monorepo catalog on this machine.
- * Used by GitHub Actions so Ubuntu / macOS / Windows actually run
- * apt, brew, and choco — not just --dry-run.
+ * Really install every built-in in one catalog group on this machine, then require `check` to report the
+ * pinned version (any parsed version for `latest`). CI runs one job per OS × group, so apt, dnf, pacman,
+ * brew and choco all execute for real, not just --dry-run.
+ *
+ *   bun e2e/catalog-install.ts --group languages
  */
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { sortByDependencies } from "@workerstack/system"
+import {
+	BUILTIN_GROUPS,
+	BUILTINS,
+	detectOs,
+	resolveDeps,
+	resolveOsCommand,
+	sortByDependencies,
+	versionsMatch,
+} from "@workerstack/system"
 import catalog from "../examples/consumer/system.config.ts"
 
-const cli = join(import.meta.dir, "../packages/core/src/bin.ts")
+const bin = join(import.meta.dir, "../packages/core/src/bin.ts")
 const configPath = join(import.meta.dir, "../examples/consumer/system.config.ts")
-const perDepMs = Number(process.env.WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS ?? 180_000)
+const perDepMs = Number(process.env.WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS ?? 600_000)
 
-type Outcome = "ok" | "failed" | "timeout"
+const groupFlag = process.argv.indexOf("--group")
+const group = groupFlag === -1 ? undefined : process.argv[groupFlag + 1]
+if (group === undefined || !(group in BUILTIN_GROUPS)) {
+	console.error(`--group must be one of: ${Object.keys(BUILTIN_GROUPS).join(", ")}`)
+	process.exit(2)
+}
 
-const names = sortByDependencies(Object.entries(catalog.deps)).map(([name]) => name)
-const rows: Array<{ detail: string; name: string; outcome: Outcome }> = []
+const os = detectOs()
+const deps = resolveDeps(catalog.deps, { arch: process.arch, os }, BUILTINS)
+/* the group plus everything it depends on (cf needs bun from runtimes), in install order */
+const wanted = new Set(Object.keys(BUILTIN_GROUPS[group as keyof typeof BUILTIN_GROUPS]))
+for (const name of wanted) for (const need of deps[name]?.dependsOn ?? []) wanted.add(need)
+const names = sortByDependencies(Object.entries(deps))
+	.map(([name]) => name)
+	.filter((name) => wanted.has(name))
 
-async function tryOne(name: string): Promise<{ detail: string; outcome: Outcome }> {
-	const proc = Bun.spawn(["bun", cli, "install", name, "--config", configPath], {
-		cwd: join(import.meta.dir, "../examples/consumer"),
+type Outcome = "failed" | "ok" | "timeout" | "unavailable"
+
+async function cli(args: string[]): Promise<{ code: number; out: string; timedOut: boolean }> {
+	const proc = Bun.spawn(["bun", bin, ...args, "--config", configPath], {
 		env: {
 			...process.env,
 			DEBIAN_FRONTEND: "noninteractive",
@@ -30,44 +52,45 @@ async function tryOne(name: string): Promise<{ detail: string; outcome: Outcome 
 		stderr: "pipe",
 		stdout: "pipe",
 	})
-
 	let timedOut = false
 	const killer = setTimeout(() => {
 		timedOut = true
 		proc.kill()
 	}, perDepMs)
-	const [stdout, stderr, exitCode] = await Promise.all([
+	const [stdout, stderr, code] = await Promise.all([
 		new Response(proc.stdout).text(),
 		new Response(proc.stderr).text(),
 		proc.exited,
 	])
 	clearTimeout(killer)
-
-	const text = `${stdout}\n${stderr}`.trim()
-	if (text) console.log(text)
-	if (timedOut) {
-		return { detail: "timed out", outcome: "timeout" }
-	}
-	if (exitCode === 0) {
-		const kind = stdout.includes("Already installed")
-			? "already installed"
-			: stdout.includes("not available")
-				? "unavailable on this OS"
-				: "installed"
-		return { detail: kind, outcome: "ok" }
-	}
-	const last = text
-		.split("\n")
-		.map((l) => l.trim())
-		.filter(Boolean)
-		.at(-1)
-	return { detail: last ?? `exit ${exitCode}`, outcome: "failed" }
+	const out = `${stdout}\n${stderr}`.trim()
+	if (out) console.log(out)
+	return { code, out, timedOut }
 }
 
-console.log(`catalog-install — ${names.length} deps, ${perDepMs / 1000}s each`)
-console.log(`home=${homedir()} platform=${process.platform}`)
+async function tryOne(name: string): Promise<{ detail: string; outcome: Outcome }> {
+	const config = deps[name]!
+	if (resolveOsCommand(name, config, os) === null) return { detail: `not available on ${os}`, outcome: "unavailable" }
+
+	const install = await cli(["install", name, "--upgrade"])
+	if (install.timedOut) return { detail: "install timed out", outcome: "timeout" }
+	if (install.code !== 0) return { detail: `install exit ${install.code}`, outcome: "failed" }
+
+	/* check reads a new interactive shell's PATH, so it sees what install wrote into the rc file */
+	const check = await cli(["check", name])
+	const found = check.out.match(new RegExp(`^${name}@(\\S+) \\(expected `, "m"))?.[1]
+	if (!found) return { detail: "installed, but check finds nothing", outcome: "failed" }
+	if (!versionsMatch(found, config.version)) {
+		return { detail: `check finds ${found}, expected ${config.version}`, outcome: "failed" }
+	}
+	return { detail: `${found}`, outcome: "ok" }
+}
+
+console.log(`catalog-install — group ${group}: ${names.join(", ")}`)
+console.log(`home=${homedir()} os=${os} arch=${process.arch}`)
 console.log("=".repeat(60))
 
+const rows: Array<{ detail: string; name: string; outcome: Outcome }> = []
 for (const name of names) {
 	console.log(`\n>> ${name}`)
 	const result = await tryOne(name)
@@ -75,26 +98,22 @@ for (const name of names) {
 	console.log(`   ${result.outcome}: ${result.detail}`)
 }
 
-const ok = rows.filter((r) => r.outcome === "ok").length
-const failed = rows.filter((r) => r.outcome === "failed").length
-const timeout = rows.filter((r) => r.outcome === "timeout").length
-
+const count = (outcome: Outcome) => rows.filter((row) => row.outcome === outcome).length
 const table = [
 	"| dep | result | detail |",
 	"| --- | --- | --- |",
-	...rows.map((r) => `| ${r.name} | ${r.outcome} | ${r.detail.replaceAll("|", "/")} |`),
+	...rows.map((row) => `| ${row.name} | ${row.outcome} | ${row.detail.replaceAll("|", "/")} |`),
 	"",
-	`ok ${ok} · failed ${failed} · timeout ${timeout} · total ${rows.length}`,
+	`ok ${count("ok")} · unavailable ${count("unavailable")} · failed ${count("failed")} · timeout ${count("timeout")}`,
 ].join("\n")
+console.log(`\n${"=".repeat(60)}\n${table}`)
 
-console.log(`\n${"=".repeat(60)}`)
-console.log(table)
-
-const summary = process.env.GITHUB_STEP_SUMMARY
-if (summary) {
-	await Bun.write(summary, `# Catalog install (${process.platform})\n\n${table}\n`)
+if (process.env.GITHUB_STEP_SUMMARY) {
+	await Bun.write(process.env.GITHUB_STEP_SUMMARY, `# Catalog install: ${group} on ${os}\n\n${table}\n`)
 }
 
-/* any failed/timed-out dep fails the job so leftover reds are visible */
-if (failed + timeout > 0) process.exit(1)
-if (ok === 0) process.exit(1)
+/* a required dep that fails, or a group with nothing installed, fails the job */
+const failedRequired = rows.filter(
+	(row) => (row.outcome === "failed" || row.outcome === "timeout") && deps[row.name]!.required,
+)
+if (failedRequired.length > 0 || count("ok") === 0) process.exit(1)

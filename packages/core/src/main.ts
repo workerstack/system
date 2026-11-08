@@ -4,9 +4,12 @@
 
 import { dirname } from "node:path"
 import { parseArgs } from "./args.ts"
+import { BUILTINS } from "./builtins/index.ts"
+import { resolveDeps } from "./builtins/resolve.ts"
 import { checkCommand } from "./commands/check.ts"
 import { envCommand } from "./commands/env.ts"
 import { installCommand } from "./commands/install.ts"
+import { listCommand } from "./commands/list.ts"
 import { syncPmCommand } from "./commands/sync-pm.ts"
 import { ConfigError } from "./errors.ts"
 import { findConfig, importConfig } from "./load.ts"
@@ -23,6 +26,7 @@ Commands:
   check <name>         Check single dep
   env                  Setup environment variables
   sync-pm              Sync packageManager field in package.json
+  list                 List built-in deps (give a version: go: "1.27.2")
 
 Flags:
   --config <path>      Config file (default: system.config.ts in cwd)
@@ -32,7 +36,7 @@ Flags:
   --here               check: use this process PATH instead of an interactive-shell snapshot
 `
 
-const COMMANDS = ["check", "env", "install", "sync-pm"] as const
+const COMMANDS = ["check", "env", "install", "list", "sync-pm"] as const
 
 async function run(argv: readonly string[], rt: Runtime): Promise<number> {
 	const parsed = parseArgs(argv)
@@ -49,6 +53,8 @@ async function run(argv: readonly string[], rt: Runtime): Promise<number> {
 		return 1
 	}
 
+	if (args.command === "list") return listCommand(rt, BUILTINS)
+
 	const found = findConfig(rt, args.config)
 	if (!found.ok) {
 		rt.error(found.error)
@@ -61,10 +67,11 @@ async function run(argv: readonly string[], rt: Runtime): Promise<number> {
 	}
 
 	const override = args.os ?? rt.env.WORKERSTACK_SYSTEM_OS
+	const os = detectOsFromPlatform(rt.platform, override, (command) => rt.which(command) !== null)
 	const ctx: Context = {
 		configDir: dirname(found.value),
-		deps: loaded.value.deps,
-		os: detectOsFromPlatform(rt.platform, override, (command) => rt.which(command) !== null),
+		deps: resolveDeps(loaded.value.deps, { arch: rt.arch, os }, BUILTINS),
+		os,
 		packageJsonPath: loaded.value.packageJsonPath ?? "package.json",
 		rt,
 	}

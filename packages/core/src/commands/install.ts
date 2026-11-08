@@ -2,6 +2,7 @@ import { resolveOsCommand, type SystemDepConfig } from "../config.ts"
 import { versionsMatch } from "../version.ts"
 import { sortByDependencies } from "../graph.ts"
 import { type Context, probeInstalled } from "../probe.ts"
+import { expandPath } from "../env.ts"
 import { configureEnvVars } from "./env.ts"
 
 export interface InstallOptions {
@@ -55,8 +56,21 @@ function installOne(ctx: Context, name: string, config: SystemDepConfig, opts: I
 	return "installed"
 }
 
+/**
+ * Put every dep's `{ path }` dirs first on this run's PATH, so a dep finds a prerequisite installed earlier
+ * in the same run (ruff needs uv) and the skip check sees the pinned binary before a system one.
+ */
+function prependDepPaths(ctx: Context): void {
+	for (const config of Object.values(ctx.deps)) {
+		for (const entry of config.env ?? []) {
+			if ("path" in entry) ctx.rt.prependPath(expandPath(entry.path, ctx.rt.home, ctx.rt.env))
+		}
+	}
+}
+
 export function installCommand(ctx: Context, target: string | undefined, opts: InstallOptions): number {
 	const { rt } = ctx
+	prependDepPaths(ctx)
 
 	if (target !== undefined) {
 		const config = ctx.deps[target]

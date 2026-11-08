@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path"
 import { describe, expect, it } from "vitest"
-import { applyEnvBlock, expandPath, reloadHint, renderEnvBlock, shellConfigPath, shellKind } from "../../src/env.ts"
+import { applyEnvBlock, expandPath, reloadHint, renderEnvBlock, shellConfigPaths, shellKind } from "../../src/env.ts"
 
 describe("shellKind", () => {
 	it("uses PowerShell on Windows whatever SHELL says", () => {
@@ -16,25 +16,28 @@ describe("shellKind", () => {
 	})
 })
 
-describe("shellConfigPath", () => {
+describe("shellConfigPaths", () => {
 	const home = join("home", "me")
 
-	it("writes the PowerShell 7 profile on Windows", () => {
-		expect(shellConfigPath(home, "powershell")).toBe(
+	it("writes the PowerShell 7 and Windows PowerShell 5.1 profiles on Windows", () => {
+		expect(shellConfigPaths(home, "powershell")).toEqual([
 			resolve(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1"),
-		)
+			resolve(home, "Documents", "WindowsPowerShell", "Microsoft.PowerShell_profile.ps1"),
+		])
 	})
 
 	it("writes .zshrc for zsh and .bashrc otherwise", () => {
-		expect(shellConfigPath(home, "posix", "/bin/zsh")).toBe(resolve(home, ".zshrc"))
-		expect(shellConfigPath(home, "posix", "/bin/bash")).toBe(resolve(home, ".bashrc"))
+		expect(shellConfigPaths(home, "posix", "/bin/zsh")).toEqual([resolve(home, ".zshrc")])
+		expect(shellConfigPaths(home, "posix", "/bin/bash")).toEqual([resolve(home, ".bashrc")])
 	})
 
 	it("writes a fish conf.d file, under XDG_CONFIG_HOME when set", () => {
-		expect(shellConfigPath(home, "fish")).toBe(resolve(home, ".config", "fish", "conf.d", "workerstack-system.fish"))
-		expect(shellConfigPath(home, "fish", "/usr/bin/fish", { XDG_CONFIG_HOME: "/xdg" })).toBe(
+		expect(shellConfigPaths(home, "fish")).toEqual([
+			resolve(home, ".config", "fish", "conf.d", "workerstack-system.fish"),
+		])
+		expect(shellConfigPaths(home, "fish", "/usr/bin/fish", { XDG_CONFIG_HOME: "/xdg" })).toEqual([
 			resolve("/xdg", "fish", "conf.d", "workerstack-system.fish"),
-		)
+		])
 	})
 })
 
@@ -44,6 +47,13 @@ describe("expandPath", () => {
 		expect(expandPath("${HOME}/tool", "/home/me")).toBe("/home/me/tool")
 		expect(expandPath("%USERPROFILE%\\tool", "C:\\Users\\me")).toBe("C:\\Users\\me\\tool")
 		expect(expandPath("%home%\\tool", "C:\\Users\\me")).toBe("C:\\Users\\me\\tool")
+	})
+
+	it("expands PowerShell $env:NAME", () => {
+		expect(
+			expandPath("$env:LOCALAPPDATA\\bin", "C:\\Users\\me", { LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local" }),
+		).toBe("C:\\Users\\me\\AppData\\Local\\bin")
+		expect(expandPath("$env:NOPE\\bin", "C:\\h", {})).toBe("$env:NOPE\\bin")
 	})
 
 	it("expands any variable from env and leaves unknown ones literal", () => {

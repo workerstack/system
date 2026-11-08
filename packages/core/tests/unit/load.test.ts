@@ -44,8 +44,8 @@ describe("importConfig", () => {
 	})
 
 	it("throws a ConfigError for an invalid config", async () => {
-		const rt = fakeRuntime({ modules: { "/c.ts": { default: { deps: { go: { version: "1" } } } } } })
-		await expect(importConfig(rt, "/c.ts")).rejects.toThrow(/^Invalid system config:\n  - deps.go.description/)
+		const rt = fakeRuntime({ modules: { "/c.ts": { default: { deps: { mytool: { version: "1" } } } } } })
+		await expect(importConfig(rt, "/c.ts")).rejects.toThrow(/^Invalid system config:\n  - deps.mytool.description/)
 	})
 
 	it("fails when no export holds deps", async () => {

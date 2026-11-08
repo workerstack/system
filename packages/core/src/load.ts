@@ -6,6 +6,7 @@ import { resolve } from "node:path"
 import type { SystemConfig } from "./config.ts"
 import type { Runtime } from "./runtime.ts"
 import { validateConfig } from "./validate.ts"
+import { BUILTIN_NAMES } from "./builtins/index.ts"
 
 export const CONFIG_NAMES = ["system.config.ts", "system.config.js", "system.config.mjs"] as const
 
@@ -38,5 +39,5 @@ export async function importConfig(rt: Runtime, path: string): Promise<Result<Sy
 	if (config === undefined) {
 		return { error: "Config file must export an object with a `deps` field (use defineConfig)", ok: false }
 	}
-	return { ok: true, value: validateConfig(config) }
+	return { ok: true, value: validateConfig(config, BUILTIN_NAMES) }
 }

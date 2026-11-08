@@ -30,6 +30,14 @@ describe("versionsMatch", () => {
 		expect(versionsMatch("21.0.12+7", "21.0.12+7")).toBe(true)
 	})
 
+	it("ignores installed build metadata unless the pin has some", () => {
+		expect(versionsMatch("21.0.13+9", "21")).toBe(true)
+		expect(versionsMatch("21.0.13+9", "21.0.13")).toBe(true)
+		expect(versionsMatch("21.0.13+9", "21.0.12")).toBe(false)
+		expect(versionsMatch("21.0.13+9", "21.0.13+7")).toBe(false)
+		expect(versionsMatch("21.0.13+9-LTS", "21")).toBe(true)
+	})
+
 	it("matches anything for latest", () => {
 		expect(versionsMatch("0.0.1", "latest")).toBe(true)
 	})

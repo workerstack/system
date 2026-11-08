@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { describe, expect, it, vi } from "vitest"
 import { processPath } from "../../src/path.ts"
 import { nodeRuntime } from "../../src/runtime.ts"
@@ -49,6 +49,17 @@ describe("nodeRuntime", () => {
 		const path = join(mkdtempSync(join(tmpdir(), "system-rt-")), "c.mjs")
 		writeFileSync(path, "export default { deps: { a: 1 } }")
 		expect((await rt.importModule(path)).default).toEqual({ deps: { a: 1 } })
+	})
+
+	it("puts a dir first on this process's PATH", () => {
+		const env: NodeJS.ProcessEnv = { PATH: "/usr/bin" }
+		const local = nodeRuntime({ env })
+		local.prependPath("/opt/tool/bin")
+		local.prependPath("/opt/tool/bin")
+		expect(env.PATH).toBe(`/opt/tool/bin${delimiter}/usr/bin`)
+		const empty: NodeJS.ProcessEnv = {}
+		nodeRuntime({ env: empty }).prependPath("/x")
+		expect(empty.PATH).toBe("/x")
 	})
 
 	it("resolves binaries and snapshots a PATH", () => {

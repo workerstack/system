@@ -40,12 +40,12 @@ function unknownKeys(value: Record_, allowed: readonly string[], at: string, pro
 	}
 }
 
-function checkOs(os: unknown, at: string, problems: string[]): void {
+function checkOs(os: unknown, at: string, problems: string[], allowEmpty: boolean): void {
 	if (!isObject(os)) {
 		problems.push(`${at}: must be an object of commands`)
 		return
 	}
-	if (Object.keys(os).length === 0) problems.push(`${at}: must name at least one OS key or all`)
+	if (!allowEmpty && Object.keys(os).length === 0) problems.push(`${at}: must name at least one OS key or all`)
 	for (const [key, command] of Object.entries(os)) {
 		if (key === "all") {
 			if (!isText(command)) problems.push(`${at}.all: must be a command string`)
@@ -98,16 +98,28 @@ function checkEnvEntry(entry: unknown, at: string, problems: string[]): void {
 	}
 }
 
-/** Problems with one custom dep, each prefixed with `at` (e.g. `deps.go`). */
-export function checkDep(dep: unknown, at: string, problems: string[]): void {
+/**
+ * Problems with one dep entry, each prefixed with `at` (e.g. `deps.go`). A custom dep needs description,
+ * version, required and a non-empty os. A built-in takes a version string, or an object whose only
+ * required field is version; its os merges over the catalog's, so it may be empty.
+ */
+export function checkDep(dep: unknown, at: string, problems: string[], builtin: boolean): void {
+	if (builtin && (typeof dep === "string" || !isObject(dep))) {
+		if (!isText(dep)) problems.push(`${at}: must be a version string or { version, ... }`)
+		return
+	}
 	if (!isObject(dep)) {
 		problems.push(`${at}: must be an object`)
 		return
 	}
-	if (!isText(dep.description)) problems.push(`${at}.description: must be a non-empty string`)
+	if (!builtin || dep.description !== undefined) {
+		if (!isText(dep.description)) problems.push(`${at}.description: must be a non-empty string`)
+	}
 	if (!isText(dep.version)) problems.push(`${at}.version: must be a non-empty string`)
-	if (typeof dep.required !== "boolean") problems.push(`${at}.required: must be true or false`)
-	checkOs(dep.os, `${at}.os`, problems)
+	if (!builtin || dep.required !== undefined) {
+		if (typeof dep.required !== "boolean") problems.push(`${at}.required: must be true or false`)
+	}
+	if (!builtin || dep.os !== undefined) checkOs(dep.os, `${at}.os`, problems, builtin)
 	if (dep.check !== undefined) checkCheck(dep.check, `${at}.check`, problems)
 	if (dep.dependsOn !== undefined && !isTextList(dep.dependsOn)) {
 		problems.push(`${at}.dependsOn: must be a list of dep names`)
@@ -119,14 +131,18 @@ export function checkDep(dep: unknown, at: string, problems: string[]): void {
 	unknownKeys(dep, DEP_KEYS, `${at}.`, problems)
 }
 
-/** `config` typed as a `SystemConfig`, or a `ConfigError` listing every problem. */
-export function validateConfig(config: unknown): SystemConfig {
+/**
+ * `config` typed as a `SystemConfig`, or a `ConfigError` listing every problem.
+ * Names in `builtins` take the built-in entry forms.
+ */
+export function validateConfig(config: unknown, builtins: ReadonlySet<string> = new Set()): SystemConfig {
 	const problems: string[] = []
 	if (!isObject(config)) {
 		problems.push("config: must be an object like { deps: { ... } }")
 	} else {
 		if (!isObject(config.deps)) problems.push("deps: must be an object of dependencies")
-		else for (const [name, dep] of Object.entries(config.deps)) checkDep(dep, `deps.${name}`, problems)
+		else
+			for (const [name, dep] of Object.entries(config.deps)) checkDep(dep, `deps.${name}`, problems, builtins.has(name))
 		if (config.packageJsonPath !== undefined && typeof config.packageJsonPath !== "string") {
 			problems.push("packageJsonPath: must be a string")
 		}
