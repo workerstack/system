@@ -5,8 +5,8 @@ export async function runCli(
 	opts: { cwd?: string; env?: Record<string, string | undefined> } = {},
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> {
 	const env: Record<string, string | undefined> = { ...process.env, ...opts.env }
-	if (opts.env && "CROSSDEPS_OS" in opts.env && opts.env.CROSSDEPS_OS === undefined) {
-		delete env.CROSSDEPS_OS
+	if (opts.env && "WORKERSTACK_SYSTEM_OS" in opts.env && opts.env.WORKERSTACK_SYSTEM_OS === undefined) {
+		delete env.WORKERSTACK_SYSTEM_OS
 	}
 	const proc = Bun.spawn(["bun", cli, ...args], {
 		cwd: opts.cwd ?? process.cwd(),

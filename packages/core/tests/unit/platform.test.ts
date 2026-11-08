@@ -24,11 +24,11 @@ describe("commandExists", () => {
 	})
 
 	it("returns false for a missing command", () => {
-		expect(commandExists("crossdeps-definitely-not-installed")).toBe(false)
+		expect(commandExists("system-definitely-not-installed")).toBe(false)
 	})
 
 	it("returns true for an existing file path", () => {
-		const file = join(mkdtempSync(join(tmpdir(), "crossdeps-cmd-")), "tool")
+		const file = join(mkdtempSync(join(tmpdir(), "system-cmd-")), "tool")
 		writeFileSync(file, "")
 		expect(commandExists(file)).toBe(true)
 	})
@@ -73,17 +73,17 @@ describe("whichBinary", () => {
 	})
 
 	it("returns null for a missing command", () => {
-		expect(whichBinary("crossdeps-definitely-not-installed")).toBeNull()
+		expect(whichBinary("system-definitely-not-installed")).toBeNull()
 	})
 
 	it("returns an existing file path as-is", () => {
-		const file = join(mkdtempSync(join(tmpdir(), "crossdeps-which-")), "tool")
+		const file = join(mkdtempSync(join(tmpdir(), "system-which-")), "tool")
 		writeFileSync(file, "")
 		expect(whichBinary(file)).toBe(file)
 	})
 
 	it("strips surrounding quotes before resolving an existing file", () => {
-		const file = join(mkdtempSync(join(tmpdir(), "crossdeps-which-q-")), "tool")
+		const file = join(mkdtempSync(join(tmpdir(), "system-which-q-")), "tool")
 		writeFileSync(file, "")
 		expect(whichBinary(`"${file}"`)).toBe(file)
 		expect(whichBinary(`'${file}'`)).toBe(file)
@@ -96,13 +96,13 @@ describe("whichBinary", () => {
 	})
 
 	it("resolves a command from an explicit search PATH", () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-which-path-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-which-path-"))
 		const isWin = process.platform === "win32"
-		const name = isWin ? "crossdeps-path-probe.cmd" : "crossdeps-path-probe"
+		const name = isWin ? "system-path-probe.cmd" : "system-path-probe"
 		const file = join(dir, name)
 		writeFileSync(file, isWin ? "@echo off\r\necho 1.0.0\r\n" : "#!/bin/sh\necho 1.0.0\n")
 		if (!isWin) chmodSync(file, 0o755)
-		const token = "crossdeps-path-probe"
+		const token = "system-path-probe"
 		expect(whichBinary(token, process.platform, searchPathWith(dir))).toBeTruthy()
 		expect(whichBinary(token, process.platform, searchPathWith(join(dir, "missing")))).toBeNull()
 	})
@@ -110,12 +110,12 @@ describe("whichBinary", () => {
 
 describe("commandExists with search PATH", () => {
 	it("finds a probe only on the given PATH", () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-exists-path-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-exists-path-"))
 		const isWin = process.platform === "win32"
-		const file = join(dir, isWin ? "crossdeps-exists-probe.cmd" : "crossdeps-exists-probe")
+		const file = join(dir, isWin ? "system-exists-probe.cmd" : "system-exists-probe")
 		writeFileSync(file, isWin ? "@echo off\r\n" : "#!/bin/sh\n")
 		if (!isWin) chmodSync(file, 0o755)
-		const token = "crossdeps-exists-probe"
+		const token = "system-exists-probe"
 		expect(commandExists(token, searchPathWith(dir))).toBe(true)
 		expect(commandExists(token, searchPathWith(join(dir, "empty")))).toBe(false)
 	})

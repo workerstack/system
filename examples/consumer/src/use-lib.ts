@@ -1,5 +1,5 @@
-import { detectOs, interpolate, resolveCheckCommand, resolveOsCommand, sortByDependencies } from "@lovrozagar/crossdeps"
-import config from "../crossdeps.config.ts"
+import { detectOs, interpolate, resolveCheckCommand, resolveOsCommand, sortByDependencies } from "@workerstack/system"
+import config from "../system.config.ts"
 
 export function bunInstallCommand(): string | null {
 	return resolveOsCommand("bun", config.deps.bun!, detectOs())

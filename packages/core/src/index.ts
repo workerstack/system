@@ -1,8 +1,8 @@
 /**
- * crossdeps - Cross-platform system dependency manager
+ * @workerstack/system — cross-platform system dependency manager
  */
 
-export type { CrossdepsConfig, EnvVar, OsCommands, OsTarget, SystemDepConfig } from "./config.ts"
+export type { SystemConfig, EnvVar, OsCommands, OsTarget, SystemDepConfig } from "./config.ts"
 export {
 	defineConfig,
 	interpolate,

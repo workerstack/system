@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 (as @workerstack/system) - 2026-11-08
+
+First publish under the new name. `@lovrozagar/crossdeps` is deprecated and points here.
+
+- Renamed the package to `@workerstack/system`, the bin to `system`, the config to `system.config.{ts,js,mjs}`, and the env vars to `WORKERSTACK_SYSTEM_*` (`WORKERSTACK_SYSTEM_OS`)
+- Shell rc blocks are marked `(managed by @workerstack/system)`. `env` replaces an old `(managed by crossdeps)` block for the same tool instead of adding a second one
+
 ## 0.2.3 - 2026-08-20
 
 - TTY PATH snapshot spawn no longer inherits the caller's PATH or leftover toolchain exports. Child gets HOME/SHELL/locale/TERM plus a stock PATH so interactive rc can apply the default toolchain

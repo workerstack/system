@@ -1,15 +1,15 @@
 {
-	"name": "@crossdeps/example-consumer",
+	"name": "@workerstack/system-example-consumer",
 	"version": "0.0.1",
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"setup:deps": "crossdeps install",
-		"setup:deps:check": "crossdeps check",
+		"setup:deps": "system install",
+		"setup:deps:check": "system check",
 		"type:check": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@lovrozagar/crossdeps": "workspace:*"
+		"@workerstack/system": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:"

@@ -1,5 +1,5 @@
 {
-	"name": "@crossdeps/e2e-app",
+	"name": "@workerstack/system-e2e-app",
 	"version": "0.0.1",
 	"private": true,
 	"type": "module",
@@ -8,7 +8,7 @@
 		"type:check": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@lovrozagar/crossdeps": "workspace:*"
+		"@workerstack/system": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:"

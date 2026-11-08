@@ -2,14 +2,14 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import { describe, expect, test } from "bun:test"
-import { detectOs } from "@lovrozagar/crossdeps"
+import { detectOs } from "@workerstack/system"
 import { bunBinary, extraConfig, label, order, presentCheck, presentInstall, presentPinMatches } from "../src/app.ts"
-import config from "../crossdeps.config.ts"
+import config from "../system.config.ts"
 import { bunAppend, bunLog, bunRead, bunWrite, runCli } from "./helpers.ts"
 
 const appDir = join(import.meta.dir, "..")
 
-describe("e2e-app consumes @lovrozagar/crossdeps", () => {
+describe("e2e-app consumes @workerstack/system", () => {
 	test("defineConfig export has fixture deps", () => {
 		expect(Object.keys(config.deps).sort()).toEqual(["absent", "present", "stale", "unix-only"])
 		expect(config.packageJsonPath).toBe("package.json")
@@ -46,7 +46,7 @@ describe("CLI as a workspace consumer", () => {
 	test("check all succeeds because the only required dep is present", async () => {
 		const result = await runCli(["check"], { cwd: appDir })
 		expect(result.exitCode).toBe(0)
-		expect(result.stdout).toContain("crossdeps — System Dependencies Check")
+		expect(result.stdout).toContain("@workerstack/system — check")
 		expect(result.stdout).toContain("present@1.0.0")
 		expect(result.stdout).toContain("absent")
 	})
@@ -71,7 +71,7 @@ describe("CLI as a workspace consumer", () => {
 		const skipped = await runCli(["install", "stale"], { cwd: appDir })
 		expect(skipped.exitCode).toBe(0)
 		expect(skipped.stdout).toContain("Already installed (9.9.9)")
-		expect(skipped.stdout).toContain("crossdeps install stale --upgrade")
+		expect(skipped.stdout).toContain("system install stale --upgrade")
 
 		const upgraded = await runCli(["install", "stale", "--upgrade"], { cwd: appDir })
 		expect(upgraded.exitCode).toBe(0)
@@ -84,7 +84,7 @@ describe("CLI as a workspace consumer", () => {
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("Already installed (9.9.9)")
 		expect(result.stdout).toMatch(/expected 1\.0\.0\) \S+/)
-		expect(result.stdout).toContain("crossdeps install stale --upgrade")
+		expect(result.stdout).toContain("system install stale --upgrade")
 		expect(result.stdout).not.toContain("Installed successfully")
 	})
 
@@ -105,11 +105,11 @@ describe("CLI as a workspace consumer", () => {
 	})
 
 	test("install --upgrade does not warn when check version matches after install", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-upgrade-match-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-upgrade-match-"))
 		const versionFile = join(dir, "version.txt")
 		writeFileSync(versionFile, "9.9.9")
 		writeFileSync(
-			join(dir, "crossdeps.config.ts"),
+			join(dir, "system.config.ts"),
 			`export default {
 	deps: {
 		bump: {
@@ -123,7 +123,7 @@ describe("CLI as a workspace consumer", () => {
 }
 `,
 		)
-		const result = await runCli(["install", "bump", "--upgrade", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["install", "bump", "--upgrade", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: { VERSION_FILE: versionFile },
 		})
@@ -146,7 +146,7 @@ describe("CLI as a workspace consumer", () => {
 		const result = await runCli(["check"], { cwd: appDir })
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toMatch(/stale@9\.9\.9 \(expected 1\.0\.0\) \S+/)
-		expect(result.stdout).toContain("crossdeps install --upgrade")
+		expect(result.stdout).toContain("system install --upgrade")
 	})
 
 	test("check named mismatch exits 0 and prints expected plus path", async () => {
@@ -183,7 +183,7 @@ describe("CLI as a workspace consumer", () => {
 	})
 
 	test("install --config uses the given file", async () => {
-		const result = await runCli(["check", "present", "--config", join(appDir, "crossdeps.config.ts")], {
+		const result = await runCli(["check", "present", "--config", join(appDir, "system.config.ts")], {
 			cwd: appDir,
 		})
 		expect(result.exitCode).toBe(0)
@@ -193,13 +193,13 @@ describe("CLI as a workspace consumer", () => {
 	test("missing config file fails", async () => {
 		const result = await runCli(["check"], { cwd: tmpdir() })
 		expect(result.exitCode).toBe(1)
-		expect(result.stderr).toContain("No crossdeps config found")
+		expect(result.stderr).toContain("No system config found")
 	})
 
 	test("unknown command prints usage and fails", async () => {
 		const result = await runCli(["wat"], { cwd: appDir })
 		expect(result.exitCode).toBe(1)
-		expect(result.stdout).toContain("Usage: crossdeps")
+		expect(result.stdout).toContain("Usage: system")
 		expect(result.stderr).toContain("Unknown command: wat")
 	})
 
@@ -211,14 +211,14 @@ describe("CLI as a workspace consumer", () => {
 	})
 
 	test("install writes the command output for a missing dep", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-install-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-install-"))
 		const marker = join(dir, "installed.txt")
 		writeFileSync(
-			join(dir, "crossdeps.config.ts"),
+			join(dir, "system.config.ts"),
 			`export default {
 	deps: {
 		fresh: {
-			check: { command: "crossdeps-definitely-missing --version" },
+			check: { command: "system-definitely-missing --version" },
 			description: "fresh install",
 			os: { all: ${JSON.stringify(bunWrite("MARKER", "fresh-ok"))} },
 			required: true,
@@ -228,7 +228,7 @@ describe("CLI as a workspace consumer", () => {
 }
 `,
 		)
-		const result = await runCli(["install", "fresh", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["install", "fresh", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: { MARKER: marker },
 		})
@@ -239,14 +239,14 @@ describe("CLI as a workspace consumer", () => {
 	})
 
 	test("install respects dependsOn order", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-order-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-order-"))
 		const marker = join(dir, "order.txt")
 		writeFileSync(
-			join(dir, "crossdeps.config.ts"),
+			join(dir, "system.config.ts"),
 			`export default {
 	deps: {
 		child: {
-			check: { command: "crossdeps-definitely-missing --version" },
+			check: { command: "system-definitely-missing --version" },
 			dependsOn: ["parent"],
 			description: "child",
 			os: { all: ${JSON.stringify(bunAppend("MARKER", "child"))} },
@@ -254,7 +254,7 @@ describe("CLI as a workspace consumer", () => {
 			version: "1.0.0",
 		},
 		parent: {
-			check: { command: "crossdeps-definitely-missing --version" },
+			check: { command: "system-definitely-missing --version" },
 			description: "parent",
 			os: { all: ${JSON.stringify(bunAppend("MARKER", "parent"))} },
 			required: true,
@@ -264,7 +264,7 @@ describe("CLI as a workspace consumer", () => {
 }
 `,
 		)
-		const result = await runCli(["install", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["install", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: { MARKER: marker },
 		})
@@ -273,13 +273,13 @@ describe("CLI as a workspace consumer", () => {
 	})
 
 	test("sync-pm updates packageManager from the bun dep version", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-sync-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-sync-"))
 		writeFileSync(
 			join(dir, "package.json"),
 			`${JSON.stringify({ name: "sync-fixture", packageManager: "bun@0.0.1" }, null, "\t")}\n`,
 		)
 		writeFileSync(
-			join(dir, "crossdeps.config.ts"),
+			join(dir, "system.config.ts"),
 			`export default {
 	deps: {
 		bun: {
@@ -292,7 +292,7 @@ describe("CLI as a workspace consumer", () => {
 }
 `,
 		)
-		const result = await runCli(["sync-pm", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["sync-pm", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 		})
 		expect(result.exitCode).toBe(0)
@@ -304,10 +304,10 @@ describe("CLI as a workspace consumer", () => {
 	})
 
 	test("env writes markers into an isolated HOME", async () => {
-		const home = mkdtempSync(join(tmpdir(), "crossdeps-home-"))
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-env-"))
+		const home = mkdtempSync(join(tmpdir(), "system-home-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-env-"))
 		writeFileSync(
-			join(dir, "crossdeps.config.ts"),
+			join(dir, "system.config.ts"),
 			`export default {
 	deps: {
 		tool: {
@@ -324,7 +324,7 @@ describe("CLI as a workspace consumer", () => {
 }
 `,
 		)
-		const result = await runCli(["env", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["env", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: { HOME: home, SHELL: "/bin/bash", USERPROFILE: home },
 		})
@@ -333,7 +333,7 @@ describe("CLI as a workspace consumer", () => {
 			process.platform === "win32"
 				? readFileSync(join(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1"), "utf-8")
 				: readFileSync(join(home, ".bashrc"), "utf-8")
-		expect(written).toContain("# tool environment (managed by crossdeps)")
+		expect(written).toContain("# tool environment (managed by @workerstack/system)")
 		if (process.platform === "win32") {
 			expect(written).toContain('$env:TOOL_HOME = "$HOME/tool"')
 			expect(written).toContain('$env:Path += ";$HOME/tool/bin"')
@@ -344,7 +344,7 @@ describe("CLI as a workspace consumer", () => {
 	})
 })
 
-const PATH_PROBE = "crossdeps-path-probe"
+const PATH_PROBE = "system-path-probe"
 const TTY_PATH_WARN = "could not read interactive-shell PATH; using this process PATH"
 
 function writePathProbe(dir: string, version: string): void {
@@ -359,7 +359,7 @@ function writePathProbe(dir: string, version: string): void {
 }
 
 function writeProbeConfig(dir: string, version = "4.4.4"): string {
-	const configPath = join(dir, "crossdeps.config.ts")
+	const configPath = join(dir, "system.config.ts")
 	writeFileSync(
 		configPath,
 		`export default {
@@ -399,7 +399,7 @@ exit 1
 
 describe("CLI check PATH snapshot", () => {
 	test("--here uses this process PATH", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-path-here-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-path-here-"))
 		writePathProbe(dir, "4.4.4")
 		const configPath = writeProbeConfig(dir)
 		const path = `${dir}${delimiter}${process.env.PATH ?? ""}`
@@ -419,14 +419,14 @@ describe("CLI check PATH snapshot", () => {
 	})
 
 	test("install uses process PATH and ignores --here", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-path-install-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-path-install-"))
 		writePathProbe(dir, "4.4.4")
 		const configPath = writeProbeConfig(dir)
 		const path = `${dir}${delimiter}${process.env.PATH ?? ""}`
 
 		const installed = await runCli(["install", "probe", "--here", "--config", configPath], {
 			cwd: dir,
-			env: { PATH: path, SHELL: "/no/such/crossdeps-shell" },
+			env: { PATH: path, SHELL: "/no/such/system-shell" },
 		})
 		expect(installed.exitCode, `${installed.stdout}\n${installed.stderr}`).toBe(0)
 		expect(installed.stdout).toContain("Already installed (4.4.4)")
@@ -436,7 +436,7 @@ describe("CLI check PATH snapshot", () => {
 	test("check --here still works when TTY spawn would fail", async () => {
 		const result = await runCli(["check", "--here", "present"], {
 			cwd: appDir,
-			env: { SHELL: "/no/such/crossdeps-shell" },
+			env: { SHELL: "/no/such/system-shell" },
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("present@1.0.0")
@@ -447,7 +447,7 @@ describe("CLI check PATH snapshot", () => {
 describe("CLI check PATH snapshot (unix interactive shell)", () => {
 	test("check sees interactive rc PATH, not login-only files", async () => {
 		if (process.platform === "win32") return
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-path-rc-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-path-rc-"))
 		const home = join(dir, "home")
 		const interactiveDir = join(home, "interactive-bin")
 		const loginDir = join(home, "login-bin")
@@ -462,7 +462,7 @@ describe("CLI check PATH snapshot (unix interactive shell)", () => {
 		const poisonDir = join(home, "poison-bin")
 		mkdirSync(poisonDir, { recursive: true })
 		writePathProbe(poisonDir, "9.9.9")
-		const result = await runCli(["check", "probe", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["check", "probe", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: {
 				HOME: home,
@@ -479,7 +479,7 @@ describe("CLI check PATH snapshot (unix interactive shell)", () => {
 
 	test("check uses the PATH printed by an interactive $SHELL", async () => {
 		if (process.platform === "win32") return
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-path-login-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-path-login-"))
 		const loginDir = join(dir, "login")
 		const processDir = join(dir, "proc")
 		mkdirSync(loginDir)
@@ -490,7 +490,7 @@ describe("CLI check PATH snapshot (unix interactive shell)", () => {
 		const shell = writeFakeTtyShell(dir, loginDir)
 		const path = `${processDir}${delimiter}${process.env.PATH ?? ""}`
 
-		const result = await runCli(["check", "probe", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["check", "probe", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: { PATH: path, SHELL: shell },
 		})
@@ -502,14 +502,14 @@ describe("CLI check PATH snapshot (unix interactive shell)", () => {
 
 	test("TTY spawn fail falls back to process PATH with one warning", async () => {
 		if (process.platform === "win32") return
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-path-fail-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-path-fail-"))
 		writePathProbe(dir, "4.4.4")
 		writeProbeConfig(dir)
 		const path = `${dir}${delimiter}${process.env.PATH ?? ""}`
 
-		const result = await runCli(["check", "probe", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["check", "probe", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
-			env: { PATH: path, SHELL: "/no/such/crossdeps-shell" },
+			env: { PATH: path, SHELL: "/no/such/system-shell" },
 		})
 		expect(result.exitCode, `${result.stdout}\n${result.stderr}`).toBe(0)
 		expect(result.stdout).toContain("probe@4.4.4")
@@ -518,13 +518,13 @@ describe("CLI check PATH snapshot (unix interactive shell)", () => {
 
 	test("empty TTY PATH falls back to process PATH with one warning", async () => {
 		if (process.platform === "win32") return
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-path-empty-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-path-empty-"))
 		writePathProbe(dir, "4.4.4")
 		writeProbeConfig(dir)
 		const shell = writeFakeTtyShell(dir, "")
 		const path = `${dir}${delimiter}${process.env.PATH ?? ""}`
 
-		const result = await runCli(["check", "probe", "--config", join(dir, "crossdeps.config.ts")], {
+		const result = await runCli(["check", "probe", "--config", join(dir, "system.config.ts")], {
 			cwd: dir,
 			env: { PATH: path, SHELL: shell },
 		})

@@ -2,17 +2,17 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
-import { detectOs, OS_TARGETS, resolveOsCommand } from "@lovrozagar/crossdeps"
+import { detectOs, OS_TARGETS, resolveOsCommand } from "@workerstack/system"
 import { bunLog, bunWrite, runCli } from "./helpers.ts"
 
 function writeOsFixture(dir: string): string {
-	const configPath = join(dir, "crossdeps.config.ts")
+	const configPath = join(dir, "system.config.ts")
 	writeFileSync(
 		configPath,
 		`export default {
 	deps: {
 		marker: {
-			check: { command: "crossdeps-definitely-missing --version" },
+			check: { command: "system-definitely-missing --version" },
 			description: "per-OS install marker",
 			os: {
 				"linux-apt": ${JSON.stringify(bunWrite("MARKER", "linux-apt"))},
@@ -55,7 +55,7 @@ describe("OS install matrix", () => {
 	})
 
 	test("install runs the command for the active OS", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-os-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-os-"))
 		const marker = join(dir, "os.txt")
 		const configPath = writeOsFixture(dir)
 		const os = detectOs()
@@ -88,13 +88,13 @@ describe("OS install matrix", () => {
 	})
 
 	test("--os forces the windows command on this host", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-os-flag-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-os-flag-"))
 		const marker = join(dir, "os.txt")
 		const configPath = writeOsFixture(dir)
 
 		const result = await runCli(["install", "marker", "--os", "windows", "--config", configPath], {
 			cwd: dir,
-			env: { CROSSDEPS_OS: undefined, MARKER: marker },
+			env: { WORKERSTACK_SYSTEM_OS: undefined, MARKER: marker },
 		})
 		expect(result.exitCode, `${result.stdout}\n${result.stderr}`).toBe(0)
 		expect(result.stdout).toContain("Installed successfully")
@@ -102,23 +102,23 @@ describe("OS install matrix", () => {
 	})
 
 	test("windows marks unix-only as unavailable", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-os-unavail-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-os-unavail-"))
 		const configPath = writeOsFixture(dir)
 
 		const result = await runCli(["install", "unix-only", "--os", "windows", "--config", configPath], {
 			cwd: dir,
-			env: { CROSSDEPS_OS: undefined },
+			env: { WORKERSTACK_SYSTEM_OS: undefined },
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("not available on windows")
 	})
 
 	test("unknown --os fails", async () => {
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-os-bad-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-os-bad-"))
 		const configPath = writeOsFixture(dir)
 		const result = await runCli(["install", "--os", "freebsd", "--config", configPath], {
 			cwd: dir,
-			env: { CROSSDEPS_OS: undefined },
+			env: { WORKERSTACK_SYSTEM_OS: undefined },
 		})
 		expect(result.exitCode).toBe(1)
 		expect(result.stderr).toContain("Unknown OS target: freebsd")
@@ -144,11 +144,11 @@ function allOs(cmd: string) {
 }
 
 describe("real install", () => {
-	test("downloads jq, stripe-cli, and cloudflared when CROSSDEPS_REAL_INSTALL=1", async () => {
-		if (process.env.CROSSDEPS_REAL_INSTALL !== "1") return
+	test("downloads jq, stripe-cli, and cloudflared when WORKERSTACK_SYSTEM_REAL_INSTALL=1", async () => {
+		if (process.env.WORKERSTACK_SYSTEM_REAL_INSTALL !== "1") return
 
 		const os = detectOs()
-		const dir = mkdtempSync(join(tmpdir(), "crossdeps-bins-"))
+		const dir = mkdtempSync(join(tmpdir(), "system-bins-"))
 		const bindir = join(dir, "bin")
 		mkdirSync(bindir)
 		const cpu = process.arch === "arm64" ? "arm64" : "amd64"
@@ -183,7 +183,7 @@ describe("real install", () => {
 		const archiveCmd = fetchArchiveToDir()
 
 		writeFileSync(
-			join(dir, "crossdeps.config.ts"),
+			join(dir, "system.config.ts"),
 			`export default {
 	deps: {
 		cloudflared: {
@@ -219,14 +219,14 @@ describe("real install", () => {
 		]
 
 		for (const tool of tools) {
-			const install = await runCli(["install", tool.name, "--config", join(dir, "crossdeps.config.ts")], {
+			const install = await runCli(["install", tool.name, "--config", join(dir, "system.config.ts")], {
 				cwd: dir,
 				env: { DEST: tool.dest, URL: tool.url },
 			})
 			expect(install.exitCode, `${tool.name}\n${install.stdout}\n${install.stderr}`).toBe(0)
 			expect(install.stdout, tool.name).toContain("Installed successfully")
 
-			const check = await runCli(["check", tool.name, "--config", join(dir, "crossdeps.config.ts")], {
+			const check = await runCli(["check", tool.name, "--config", join(dir, "system.config.ts")], {
 				cwd: dir,
 			})
 			expect(check.exitCode, tool.name).toBe(0)

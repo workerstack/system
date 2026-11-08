@@ -61,7 +61,7 @@ function detectLinuxDistro(): OsTarget {
 
 export function detectOsFromPlatform(
 	platform: NodeJS.Platform,
-	override: string | undefined = process.env.CROSSDEPS_OS,
+	override: string | undefined = process.env.WORKERSTACK_SYSTEM_OS,
 ): OsTarget {
 	if (override) return parseOsTarget(override)
 	if (platform === "darwin") return "macos"
@@ -71,8 +71,8 @@ export function detectOsFromPlatform(
 
 /**
  * Detect the current OS target.
- * `override` (or `CROSSDEPS_OS`) forces a target — used by tests and `--os`.
+ * `override` (or `WORKERSTACK_SYSTEM_OS`) forces a target — used by tests and `--os`.
  */
-export function detectOs(override: string | undefined = process.env.CROSSDEPS_OS): OsTarget {
+export function detectOs(override: string | undefined = process.env.WORKERSTACK_SYSTEM_OS): OsTarget {
 	return detectOsFromPlatform(process.platform, override)
 }
