@@ -108,6 +108,8 @@ describe("ttySnapshotEnv", () => {
 				TERM: "xterm",
 				PATH: "/stale/bin:/usr/bin",
 				NVM_BIN: "/stale/bin",
+				TERM_PROGRAM: undefined,
+				USERPROFILE: undefined,
 			},
 			"linux",
 		)
@@ -119,6 +121,7 @@ describe("ttySnapshotEnv", () => {
 		expect(env.TERM).toBe("xterm")
 		expect(env.PATH).toBe(unixStockPath())
 		expect(env.NVM_BIN).toBeUndefined()
+		expect("USERPROFILE" in env).toBe(false)
 	})
 
 	it("drops parent PATH and leftover toolchain exports", () => {

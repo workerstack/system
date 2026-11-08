@@ -12,4 +12,11 @@ export {
 	versionsMatch,
 } from "./config.ts"
 export { sortByDependencies } from "./graph.ts"
-export { commandExists, commandLookup, detectOs, detectOsFromPlatform, parseOsTarget, whichBinary } from "./platform.ts"
+export {
+	commandExists,
+	detectLinuxDistro,
+	detectOs,
+	detectOsFromPlatform,
+	parseOsTarget,
+	whichBinary,
+} from "./platform.ts"

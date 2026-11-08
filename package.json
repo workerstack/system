@@ -10,6 +10,7 @@
 		],
 		"catalog": {
 			"@types/node": "26.1.1",
+			"@vitest/coverage-v8": "4.1.10",
 			"oxfmt": "0.63.0",
 			"oxlint": "1.78.0",
 			"typescript": "7.0.2",
@@ -45,6 +46,7 @@
 		"test:catalog-install": "bun e2e/catalog-install.ts",
 		"test:consumers": "bun test e2e/app/tests",
 		"test:e2e:docker": "bash e2e/docker/run.sh",
+		"test:unit": "bun run --filter @workerstack/system test:unit",
 		"test:watch": "bun run --filter @workerstack/system test:watch",
 		"typecheck": "bun run --filter @workerstack/system type:check",
 		"typecheck:consumers": "bun run --filter './examples/*' type:check && bun run --filter @workerstack/system-e2e-app type:check"

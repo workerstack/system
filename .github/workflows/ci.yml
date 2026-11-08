@@ -66,7 +66,16 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - run: bun run test
+      # the 100% coverage gate runs on linux; host-only branches (bash signals) are unreachable elsewhere
+      - if: runner.os == 'Linux'
+        run: bun run test
+      - if: runner.os != 'Linux'
+        run: bun run test:unit
+      - if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: packages/core/coverage/coverage-summary.json
       - run: bun run test:consumers
         env:
           WORKERSTACK_SYSTEM_REAL_INSTALL: "1"

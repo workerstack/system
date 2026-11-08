@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { needsPowerShell, shellInvocation } from "../../src/exec.ts"
+import { needsPowerShell, runShellCommand, shellInvocation } from "../../src/exec.ts"
 
 describe("needsPowerShell", () => {
 	it("detects PowerShell-only syntax", () => {
@@ -11,11 +11,9 @@ describe("needsPowerShell", () => {
 })
 
 describe("shellInvocation", () => {
-	it("runs unix commands with bash so multi-line scripts work", () => {
-		expect(shellInvocation("echo hi", "linux")).toEqual({
-			command: "echo hi",
-			shell: "/bin/bash",
-		})
+	it("runs unix commands with bash -c so multi-line scripts work", () => {
+		expect(shellInvocation("echo hi", "linux")).toEqual({ args: ["-c", "echo hi"], file: "/bin/bash", verbatim: false })
+		expect(shellInvocation("echo hi", "darwin").file).toBe("/bin/bash")
 	})
 
 	it("uses PowerShell only for PowerShell syntax on Windows", () => {
@@ -23,15 +21,34 @@ describe("shellInvocation", () => {
 		expect(shellInvocation(irm, "win32")).toEqual({
 			args: ["-NoProfile", "-NonInteractive", "-Command", irm],
 			file: "powershell.exe",
+			verbatim: false,
 		})
 	})
 
-	it("uses cmd.exe for bun/choco on Windows", () => {
-		const inv = shellInvocation("choco install nginx || choco install nginx", "win32")
-		expect(inv).toMatchObject({
-			command: "choco install nginx || choco install nginx",
+	it("uses ComSpec, else cmd.exe, with verbatim /d /s /c for everything else on Windows", () => {
+		const command = "choco install nginx || choco install nginx"
+		expect(shellInvocation(command, "win32", { ComSpec: "C:\\Windows\\cmd.exe" })).toEqual({
+			args: ["/d", "/s", "/c", `"${command}"`],
+			file: "C:\\Windows\\cmd.exe",
+			verbatim: true,
 		})
-		expect("shell" in inv && typeof inv.shell === "string").toBe(true)
-		if ("shell" in inv) expect(inv.shell.toLowerCase()).toContain("cmd")
+		expect(shellInvocation(command, "win32", {}).file).toBe("cmd.exe")
+	})
+})
+
+describe("runShellCommand", () => {
+	it("returns on exit 0 and throws on failure", () => {
+		const node = JSON.stringify(process.execPath)
+		expect(() => runShellCommand(`${node} -e "process.exit(0)"`)).not.toThrow()
+		expect(() => runShellCommand(`${node} -e "process.exit(2)"`)).toThrow(/^exit 2: /)
+	})
+
+	it("throws when the shell itself cannot start", () => {
+		/* powershell.exe is absent on unix; on Windows the command fails instead. Either way it throws. */
+		expect(() => runShellCommand("irm https://invalid.invalid | iex", "win32")).toThrow()
+	})
+
+	it.skipIf(process.platform === "win32")("reports the signal when the shell is killed", () => {
+		expect(() => runShellCommand("kill -TERM $$", "linux")).toThrow(/^exit SIGTERM: /)
 	})
 })

@@ -1,5 +1,4 @@
-import { mkdirSync } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { resolve } from "node:path"
 
 export type ShellKind = "posix" | "powershell"
 
@@ -73,10 +72,6 @@ export function applyEnvBlock(existing: string, block: string, tool: string): st
 /** True when the rc already holds a block for `tool`, current or legacy. */
 export function hasEnvBlock(existing: string, tool: string): boolean {
 	return existing.includes(envMarkers(tool).start) || existing.includes(envMarkers(tool, LEGACY_MARKER_OWNER).start)
-}
-
-export function ensureParentDir(filePath: string): void {
-	mkdirSync(dirname(filePath), { recursive: true })
 }
 
 export function reloadHint(kind: ShellKind, configName: string): string {

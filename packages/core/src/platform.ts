@@ -7,43 +7,34 @@ import { existsSync } from "node:fs"
 import { OS_TARGETS, type OsTarget } from "./config.ts"
 import { pathEnv } from "./path.ts"
 
-export function commandLookup(command: string, platform: NodeJS.Platform = process.platform): string {
-	return platform === "win32" ? `where ${command} >nul 2>&1` : `command -v ${command} >/dev/null 2>&1`
-}
+/** Run a shell command and return stdout; throws on a non-zero exit. Injected so lookups are testable. */
+export type ShellExec = (command: string, env: NodeJS.ProcessEnv | undefined) => string
 
-export function commandExists(command: string, searchPath?: string): boolean {
-	const unquoted = command.replace(/^["']|["']$/g, "")
-	if (existsSync(unquoted)) return true
-	const opts = searchPath !== undefined ? { env: pathEnv(searchPath) } : undefined
-	try {
-		execSync(commandLookup(command), opts)
-		return true
-	} catch {
-		return false
-	}
-}
+const shellExec: ShellExec = (command, env) =>
+	execSync(command, { encoding: "utf-8", env, stdio: ["ignore", "pipe", "ignore"] })
 
-/** Resolved path of the first token (`command -v` / `where`). Null if missing. */
+/** Resolved path of the first token (`command -v`, or `where` on Windows). Null if missing. */
 export function whichBinary(
 	command: string,
 	platform: NodeJS.Platform = process.platform,
 	searchPath?: string,
+	exec: ShellExec = shellExec,
 ): string | null {
 	const token = command.replace(/^["']|["']$/g, "")
 	if (!token) return null
 	if (existsSync(token)) return token
-	const opts: { encoding: "utf-8"; env?: NodeJS.ProcessEnv } = { encoding: "utf-8" }
-	if (searchPath !== undefined) opts.env = pathEnv(searchPath)
+	const lookup = platform === "win32" ? `where ${token}` : `command -v ${token}`
 	try {
-		if (platform === "win32") {
-			const out = execSync(`where ${token}`, opts).trim()
-			return out.split(/\r?\n/).find(Boolean) ?? null
-		}
-		const out = execSync(`command -v ${token}`, opts).trim()
-		return out || null
+		const out = exec(lookup, searchPath === undefined ? undefined : pathEnv(searchPath))
+		/* `where` lists every match, one per line; the first is what the shell runs */
+		return out.trim().split(/\r?\n/)[0] || null
 	} catch {
 		return null
 	}
+}
+
+export function commandExists(command: string, searchPath?: string): boolean {
+	return whichBinary(command, process.platform, searchPath) !== null
 }
 
 export function parseOsTarget(value: string): OsTarget {
@@ -51,10 +42,13 @@ export function parseOsTarget(value: string): OsTarget {
 	throw new Error(`Unknown OS target: ${value}. Expected one of: ${OS_TARGETS.join(", ")}`)
 }
 
-function detectLinuxDistro(): OsTarget {
-	if (commandExists("apt-get")) return "linux-apt"
-	if (commandExists("dnf")) return "linux-dnf"
-	if (commandExists("pacman")) return "linux-pacman"
+/** True when `command` resolves on PATH. Injected so detection is testable without the host's tools. */
+export type CommandProbe = (command: string) => boolean
+
+export function detectLinuxDistro(has: CommandProbe = commandExists): OsTarget {
+	if (has("apt-get")) return "linux-apt"
+	if (has("dnf")) return "linux-dnf"
+	if (has("pacman")) return "linux-pacman"
 	/* default to apt if nothing detected */
 	return "linux-apt"
 }
@@ -62,11 +56,12 @@ function detectLinuxDistro(): OsTarget {
 export function detectOsFromPlatform(
 	platform: NodeJS.Platform,
 	override: string | undefined = process.env.WORKERSTACK_SYSTEM_OS,
+	has: CommandProbe = commandExists,
 ): OsTarget {
 	if (override) return parseOsTarget(override)
 	if (platform === "darwin") return "macos"
 	if (platform === "win32") return "windows"
-	return detectLinuxDistro()
+	return detectLinuxDistro(has)
 }
 
 /**

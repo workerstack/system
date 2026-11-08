@@ -20,7 +20,7 @@
 		"url": "git+https://github.com/workerstack/system.git"
 	},
 	"bin": {
-		"system": "./src/cli.ts"
+		"system": "./src/bin.ts"
 	},
 	"files": [
 		"src"
@@ -34,13 +34,15 @@
 		"access": "public"
 	},
 	"scripts": {
-		"test": "vitest run",
+		"test": "vitest run --coverage",
+		"test:unit": "vitest run",
 		"test:watch": "vitest",
-		"type:check": "tsc --noEmit -p tsconfig.src.json",
+		"type:check": "tsc --noEmit -p tsconfig.src.json && tsc --noEmit",
 		"type:check:tests": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/node": "catalog:",
+		"@vitest/coverage-v8": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

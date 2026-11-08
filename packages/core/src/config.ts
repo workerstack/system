@@ -58,12 +58,9 @@ export interface SystemConfig {
 	deps: Record<string, SystemDepConfig>
 }
 
-/**
- * Interpolate {{name}}, {{version}}, {{major}} in a string
- */
-function detectArch(): string {
-	if (process.arch === "arm64") return "arm64"
-	return "amd64"
+/** `{{arch}}` value: "arm64" on arm64, "amd64" everywhere else. */
+export function archLabel(arch: string = process.arch): "amd64" | "arm64" {
+	return arch === "arm64" ? "arm64" : "amd64"
 }
 
 /** Same table `check` uses. `"latest"` matches anything with a parsed version. */
@@ -71,13 +68,14 @@ export function versionsMatch(installed: string, expected: string): boolean {
 	return expected === "latest" || installed === expected || expected.includes(installed) || installed.includes(expected)
 }
 
-export function interpolate(template: string, name: string, version: string): string {
-	const major = version.split(".")[0] ?? version
+/** Replace {{name}}, {{version}}, {{major}} and {{arch}} in a template. */
+export function interpolate(template: string, name: string, version: string, arch: string = process.arch): string {
+	const major = version.split(".")[0] as string
 	return template
 		.replace(/\{\{name\}\}/g, name)
 		.replace(/\{\{version\}\}/g, version)
 		.replace(/\{\{major\}\}/g, major)
-		.replace(/\{\{arch\}\}/g, detectArch())
+		.replace(/\{\{arch\}\}/g, archLabel(arch))
 }
 
 /**
