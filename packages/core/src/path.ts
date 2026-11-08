@@ -11,6 +11,8 @@ export type PathSource = "tty" | "process"
 
 export interface PathSnapshot {
 	path: string
+	/** why the interactive shell could not be read, when `source` is `process` */
+	reason?: string
 	source: PathSource
 }
 
@@ -106,11 +108,17 @@ export function windowsStockPath(env: NodeJS.ProcessEnv): string {
 }
 
 /** Env for the TTY PATH spawn. Interactive rc applies the default toolchain on a stock PATH. */
+/**
+ * Unix: the keep-list, so leftover toolchain exports cannot pin a stale binary. Windows: everything but
+ * PATH and PSModulePath, because the snapshot rebuilds PATH from the registry anyway and Windows
+ * PowerShell needs its system variables to start promptly.
+ */
 export function ttySnapshotEnv(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): NodeJS.ProcessEnv {
 	const out: NodeJS.ProcessEnv = {}
 	for (const [key, value] of Object.entries(env)) {
 		if (value === undefined) continue
-		if (isTtyEnvKeep(key)) out[key] = value
+		const keep = platform === "win32" ? !/^(path|psmodulepath)$/i.test(key) : isTtyEnvKeep(key)
+		if (keep) out[key] = value
 	}
 	const stock = platform === "win32" ? windowsStockPath(env) : unixStockPath()
 	out.PATH = stock
@@ -157,8 +165,8 @@ export function snapshotTtyPath(
 				: execFile(env.SHELL || "/bin/sh", unixPathSnapshotArgs(env.SHELL || "/bin/sh"), childEnv)
 		const path = parsePathOutput(raw)
 		if (path) return { path, source: "tty" }
-	} catch {
-		/* fall through */
+		return { path: processPath(env), reason: "the shell printed no PATH", source: "process" }
+	} catch (error) {
+		return { path: processPath(env), reason: error instanceof Error ? error.message : String(error), source: "process" }
 	}
-	return { path: processPath(env), source: "process" }
 }

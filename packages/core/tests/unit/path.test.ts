@@ -159,6 +159,23 @@ describe("ttySnapshotEnv", () => {
 		expect(env.COLORTERM).toBeUndefined()
 	})
 
+	it("keeps the whole Windows env but PATH and PSModulePath (PATH is rebuilt from the registry)", () => {
+		const env = ttySnapshotEnv(
+			{
+				COMPUTERNAME: "BOX",
+				NVM_HOME: "C:\\nvm",
+				PATH: "C:\\stale",
+				PSModulePath: "C:\\pwsh7",
+				SYSTEMROOT: "C:\\Windows",
+			},
+			"win32",
+		)
+		expect(env.COMPUTERNAME).toBe("BOX")
+		expect(env.NVM_HOME).toBe("C:\\nvm")
+		expect(env.PSModulePath).toBeUndefined()
+		expect(env.PATH).toBe(windowsStockPath({ SYSTEMROOT: "C:\\Windows" }))
+	})
+
 	it("uses SystemRoot for the Windows stock PATH", () => {
 		const env = ttySnapshotEnv({ USERPROFILE: "C:\\Users\\me", SYSTEMROOT: "C:\\Windows" }, "win32")
 		expect(env.PATH).toBe(windowsStockPath({ SYSTEMROOT: "C:\\Windows" }))
@@ -293,27 +310,39 @@ describe("snapshotTtyPath", () => {
 	it("falls back when the TTY spawn throws", () => {
 		expect(snapshotTtyPath("linux", { PATH: "/process", SHELL: "/bin/bash" }, spawnFail)).toEqual({
 			path: "/process",
+			reason: "spawn ENOENT",
 			source: "process",
 		})
 		expect(snapshotTtyPath("win32", { PATH: "C:\\process" }, spawnFail)).toEqual({
 			path: "C:\\process",
+			reason: "spawn ENOENT",
 			source: "process",
 		})
+		const notError: ExecFile = () => {
+			throw "killed"
+		}
+		expect(snapshotTtyPath("linux", { PATH: "/p" }, notError).reason).toBe("killed")
 	})
 
 	it("falls back when the TTY PATH is empty", () => {
 		expect(snapshotTtyPath("linux", { PATH: "/process" }, emptyPath)).toEqual({
 			path: "/process",
+			reason: "the shell printed no PATH",
 			source: "process",
 		})
 		expect(snapshotTtyPath("win32", { Path: "C:\\process" }, emptyPath)).toEqual({
 			path: "C:\\process",
+			reason: "the shell printed no PATH",
 			source: "process",
 		})
 	})
 
 	it("falls back to empty process PATH when that is empty too", () => {
-		expect(snapshotTtyPath("linux", {}, emptyPath)).toEqual({ path: "", source: "process" })
+		expect(snapshotTtyPath("linux", {}, emptyPath)).toEqual({
+			path: "",
+			reason: "the shell printed no PATH",
+			source: "process",
+		})
 	})
 
 	it("takes PATH from bash interactive rc, not login-only files", () => {

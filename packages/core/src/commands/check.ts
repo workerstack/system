@@ -9,7 +9,7 @@ import type { Runtime } from "../runtime.ts"
 function searchPath(rt: Runtime, here: boolean): string {
 	if (here) return rt.env.PATH ?? rt.env.Path ?? ""
 	const snapshot = rt.ttyPath()
-	if (snapshot.source === "process") rt.warn(TTY_PATH_FALLBACK_WARN)
+	if (snapshot.source === "process") rt.warn(`${TTY_PATH_FALLBACK_WARN} (${snapshot.reason})`)
 	return snapshot.path
 }
 
