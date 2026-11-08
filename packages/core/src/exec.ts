@@ -37,6 +37,16 @@ export function shellInvocation(
 	return { args: ["/d", "/s", "/c", `"${command}"`], file: env.ComSpec || "cmd.exe", verbatim: true }
 }
 
+/**
+ * The env for spawning `file`. Windows PowerShell 5.1 gets no PSModulePath: one inherited from a pwsh 7
+ * parent points it at 7's modules and breaks autoload (`Get-FileHash` "not recognized"); 5.1 rebuilds
+ * its own default.
+ */
+export function shellEnv(file: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+	if (file !== "powershell.exe") return env
+	return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== "psmodulepath"))
+}
+
 /** Run `command` with inherited stdio. Throws when the shell cannot start or exits non-zero. */
 export function runShellCommand(
 	command: string,
@@ -44,7 +54,11 @@ export function runShellCommand(
 	env: NodeJS.ProcessEnv = process.env,
 ): void {
 	const { args, file, verbatim } = shellInvocation(command, platform, env)
-	const result = spawnSync(file, args, { env, stdio: "inherit", windowsVerbatimArguments: verbatim })
+	const result = spawnSync(file, args, {
+		env: shellEnv(file, env),
+		stdio: "inherit",
+		windowsVerbatimArguments: verbatim,
+	})
 	if (result.error) throw result.error
 	if (result.status !== 0) throw new Error(`exit ${result.status ?? result.signal}: ${command}`)
 }

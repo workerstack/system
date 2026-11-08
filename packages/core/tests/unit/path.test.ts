@@ -86,6 +86,13 @@ describe("isTtyEnvKeep", () => {
 		expect(isTtyEnvKeep("USERPROFILE")).toBe(true)
 	})
 
+	it("keeps the Windows user-dir variables profiles expand ($env:LOCALAPPDATA\\bin)", () => {
+		for (const key of ["LOCALAPPDATA", "APPDATA", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "TEMP", "TMP"]) {
+			expect(isTtyEnvKeep(key), key).toBe(true)
+		}
+		expect(isTtyEnvKeep("PSModulePath")).toBe(false)
+	})
+
 	it("rejects PATH and leftover toolchain exports", () => {
 		expect(isTtyEnvKeep("PATH")).toBe(false)
 		expect(isTtyEnvKeep("Path")).toBe(false)
@@ -155,7 +162,10 @@ describe("ttySnapshotEnv", () => {
 	})
 
 	it("defaults Windows stock PATH to C:\\Windows when SystemRoot is missing", () => {
-		expect(windowsStockPath({})).toBe("C:\\Windows\\System32;C:\\Windows")
+		/* includes Windows PowerShell, which the snapshot spawns by name from this PATH */
+		expect(windowsStockPath({})).toBe(
+			"C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+		)
 	})
 })
 

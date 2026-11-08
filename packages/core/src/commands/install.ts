@@ -12,6 +12,14 @@ export interface InstallOptions {
 
 type Outcome = "failed" | "installed" | "planned" | "skipped" | "unavailable"
 
+/**
+ * Write the dep's env block whenever it is present, installed now or before: an already-installed tool
+ * (a CI image's rust, a setup action's bun) is otherwise missing from a new shell's PATH.
+ */
+function writeEnv(ctx: Context, name: string, config: SystemDepConfig): void {
+	if (config.env && config.env.length > 0) configureEnvVars(ctx.rt, name, config.env)
+}
+
 function installOne(ctx: Context, name: string, config: SystemDepConfig, opts: InstallOptions): Outcome {
 	const { rt } = ctx
 	const command = resolveOsCommand(name, config, ctx.os)
@@ -31,11 +39,13 @@ function installOne(ctx: Context, name: string, config: SystemDepConfig, opts: I
 	const installed = probeInstalled(rt, name, config)
 	if (installed && versionsMatch(installed.version, config.version)) {
 		rt.log(`   Already installed (${installed.version}), skipping`)
+		writeEnv(ctx, name, config)
 		return "skipped"
 	}
 	if (installed && !opts.upgrade) {
 		rt.log(`   Already installed (${installed.version}), skipping (expected ${config.version}) ${installed.path}`)
 		rt.log(`   run: system install ${name} --upgrade`)
+		writeEnv(ctx, name, config)
 		return "skipped"
 	}
 
@@ -46,7 +56,7 @@ function installOne(ctx: Context, name: string, config: SystemDepConfig, opts: I
 	}
 
 	rt.log("   Installed successfully")
-	if (config.env && config.env.length > 0) configureEnvVars(rt, name, config.env)
+	writeEnv(ctx, name, config)
 	/* Installer often does not win PATH — brew/nvm/fnm still first. */
 	const after = probeInstalled(rt, name, config)
 	if (after && !versionsMatch(after.version, config.version)) {
