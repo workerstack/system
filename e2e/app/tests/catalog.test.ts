@@ -26,12 +26,12 @@ describe("workerstack catalog — every built-in and the custom form", () => {
 		const declared = Object.keys(catalog.deps)
 		const builtins = declared.filter((name) => BUILTIN_NAMES.has(name))
 		expect(builtins.length).toBe(BUILTIN_NAMES.size - 2)
-		expect(declared.filter((name) => !BUILTIN_NAMES.has(name))).toEqual(["stripe-cli"])
+		expect(declared.filter((name) => !BUILTIN_NAMES.has(name))).toEqual(["just"])
 	})
 
-	test("resolves to 37 deps with brew and choco added", () => {
+	test("resolves to 39 deps with brew and choco added", () => {
 		const deps = resolvedOn("linux-apt")
-		expect(Object.keys(deps).length).toBe(37)
+		expect(Object.keys(deps).length).toBe(39)
 		expect(deps.brew?.version).toBe("latest")
 		expect(deps.choco?.version).toBe("latest")
 	})
@@ -71,7 +71,9 @@ describe("workerstack catalog — every built-in and the custom form", () => {
 		expect(resolveCheckCommand("go", deps.go!)).toBe("go version")
 		expect(resolveCheckCommand("java", deps.java!)).toBe("java -version 2>&1")
 		expect(resolveCheckCommand("uv", deps.uv!)).toBe("uv --version")
-		expect(resolveCheckCommand("stripe-cli", deps["stripe-cli"]!)).toBe("stripe version")
+		expect(resolveCheckCommand("sherpa-onnx", deps["sherpa-onnx"]!)).toBe("sherpa-onnx-version")
+		expect(resolveCheckCommand("stripe", deps.stripe!)).toBe("stripe --version")
+		expect(resolveCheckCommand("just", deps.just!)).toBe("just --version")
 	})
 
 	test("windows commands never use apt or brew, macOS never apt or choco", () => {
@@ -91,7 +93,7 @@ describe("CLI dry-run of the workerstack catalog", () => {
 		const result = await runCli(["install", "--dry-run", "--config", catalogPath], { cwd: catalogDir })
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("Dry-run complete")
-		expect(result.stdout).toContain("Found 37 dependencies")
+		expect(result.stdout).toContain("Found 39 dependencies")
 	})
 
 	test("walks every OS target", async () => {

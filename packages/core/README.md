@@ -46,11 +46,12 @@ export default defineConfig({
 		ruff: "0.17.1",
 		java: "21",
 		ffmpeg: { required: false, version: "latest" },
-		"stripe-cli": {
-			description: "Stripe CLI",
-			os: { macos: "brew install stripe/stripe-cli/stripe", windows: false },
+		stripe: "1.55.10",
+		just: {
+			description: "just, a command runner",
+			os: { macos: "brew install just", windows: false },
 			required: false,
-			version: "1.53.0",
+			version: "latest",
 		},
 	},
 })
@@ -67,49 +68,51 @@ bunx system list             # the built-in catalog
 
 A built-in takes only a version. The catalog supplies install commands for every OS and CPU, the version check, PATH entries and prerequisites. `system list` prints this table.
 
-| Name                 | Group      | Version         | Where                   | What                                                                                                        |
-| -------------------- | ---------- | --------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `brew`               | bootstrap  | `latest` only   | macOS                   | Homebrew, the macOS package manager.                                                                        |
-| `choco`              | bootstrap  | `latest` only   | Windows                 | Chocolatey, the Windows package manager (needs an admin shell).                                             |
-| `bun`                | runtimes   | exact pin       | all                     | Bun: runtime and the only package manager (its version also pins packageManager).                           |
-| `deno`               | runtimes   | exact pin       | all                     | Deno, for the generated TypeScript SDK checks.                                                              |
-| `node`               | runtimes   | exact pin       | all                     | Node.js runtime, for tools that need it (bun stays the package manager).                                    |
-| `dotnet`             | languages  | exact pin       | all                     | .NET SDK, for the generated C# SDK (dotnet format included).                                                |
-| `go`                 | languages  | exact pin       | all                     | Go toolchain (gofmt included), for the generated Go SDK and CLI.                                            |
-| `google-java-format` | languages  | exact pin       | all                     | google-java-format, the generated Java SDK's formatter. Needs `java`.                                       |
-| `gradle`             | languages  | exact pin       | all                     | Gradle, the generated Java SDK's build. Needs `java`.                                                       |
-| `java`               | languages  | exact pin       | all                     | Eclipse Temurin JDK: a feature major (21) or an exact release (21.0.13+9).                                  |
-| `mypy`               | languages  | exact pin       | all                     | mypy, the generated Python SDK's type check (uv tool). Needs `uv`.                                          |
-| `python`             | languages  | exact pin       | all                     | Python, managed by uv (python and python3 shims). Needs `uv`.                                               |
-| `ruff`               | languages  | exact pin       | all                     | ruff, the generated Python SDK's formatter and linter (uv tool). Needs `uv`.                                |
-| `rust`               | languages  | exact pin       | all                     | Rust via rustup (rustfmt and clippy), for the generated Rust SDK.                                           |
-| `uv`                 | languages  | exact pin       | all                     | uv, the Python toolchain manager.                                                                           |
-| `curl`               | release    | `latest` only   | all                     | HTTP client the install commands use (the OS package manager's current build). Needs `brew`, `choco`.       |
-| `git`                | release    | `latest` only   | all                     | Version control (the OS package manager's current build). Needs `brew`, `choco`.                            |
-| `gh`                 | release    | exact pin       | all                     | GitHub CLI, for releases, PRs and the API.                                                                  |
-| `goreleaser`         | release    | exact pin       | all                     | Release automation for the generated Go CLI.                                                                |
-| `cosign`             | release    | exact pin       | all                     | Sigstore signing for release artifacts.                                                                     |
-| `jq`                 | release    | exact pin       | all                     | JSON processor.                                                                                             |
-| `pwsh`               | release    | exact pin       | all                     | PowerShell 7, for the generated Windows install scripts.                                                    |
-| `shellcheck`         | release    | exact pin       | all                     | Shell script linter, for the generated install scripts.                                                     |
-| `cf`                 | cloudflare | exact pin       | all                     | Cloudflare CLI: deploy, workers types, account operations (bun global, runs on node). Needs `bun`, `node`.  |
-| `cloudflared`        | cloudflare | exact pin       | all                     | Cloudflare Tunnel client, for remote bindings.                                                              |
-| `atlas`              | database   | exact pin       | all                     | Atlas schema migrations.                                                                                    |
-| `sqld`               | database   | exact pin       | apt, dnf, pacman, macOS | libSQL server, for local database tests (no Windows build).                                                 |
-| `chromium`           | browsers   | `latest` only   | apt, dnf, pacman        | Chromium, the browser rail fallback (Linux only: brew and choco ship no usable build).                      |
-| `docker`             | browsers   | `latest` only   | all                     | Container engine with its daemon (Docker Engine on Linux, Docker Desktop elsewhere). Needs `brew`, `choco`. |
-| `lightpanda`         | browsers   | `latest` only   | apt, dnf, pacman, macOS | Lightpanda, the default headless browser rail (nightly; no Windows build).                                  |
-| `playwright`         | browsers   | exact pin       | all                     | Playwright's Chromium for browser tests (version = your @playwright/test). Needs `bun`.                     |
-| `claude`             | agents     | pin or `latest` | all                     | Claude Code CLI (native installer; self-updates unless DISABLE_AUTOUPDATER=1).                              |
-| `codex`              | agents     | exact pin       | all                     | OpenAI Codex CLI (bun global, runs on node). Needs `bun`, `node`.                                           |
-| `ffmpeg`             | agents     | `latest` only   | all                     | ffmpeg, for /listen mic capture (the OS package manager's current build). Needs `brew`, `choco`.            |
-| `grok`               | agents     | pin or `latest` | all                     | Grok Build CLI by xAI (native installer).                                                                   |
-| `rtk`                | agents     | exact pin       | all                     | rtk, shell output compression behind the agent Bash hook.                                                   |
+| Name                 | Group      | Version         | Where                   | What                                                                                                                 |
+| -------------------- | ---------- | --------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `brew`               | bootstrap  | `latest` only   | macOS                   | Homebrew, the macOS package manager.                                                                                 |
+| `choco`              | bootstrap  | `latest` only   | Windows                 | Chocolatey, the Windows package manager (needs an admin shell).                                                      |
+| `bun`                | runtimes   | exact pin       | all                     | Bun: runtime and the only package manager (its version also pins packageManager).                                    |
+| `deno`               | runtimes   | exact pin       | all                     | Deno, for the generated TypeScript SDK checks.                                                                       |
+| `node`               | runtimes   | exact pin       | all                     | Node.js runtime, for tools that need it (bun stays the package manager).                                             |
+| `dotnet`             | languages  | exact pin       | all                     | .NET SDK, for the generated C# SDK (dotnet format included).                                                         |
+| `go`                 | languages  | exact pin       | all                     | Go toolchain (gofmt included), for the generated Go SDK and CLI.                                                     |
+| `google-java-format` | languages  | exact pin       | all                     | google-java-format, the generated Java SDK's formatter. Needs `java`.                                                |
+| `gradle`             | languages  | exact pin       | all                     | Gradle, the generated Java SDK's build. Needs `java`.                                                                |
+| `java`               | languages  | exact pin       | all                     | Eclipse Temurin JDK: a feature major (21) or an exact release (21.0.13+9).                                           |
+| `mypy`               | languages  | exact pin       | all                     | mypy, the generated Python SDK's type check (uv tool). Needs `uv`.                                                   |
+| `python`             | languages  | exact pin       | all                     | Python, managed by uv (python and python3 shims). Needs `uv`.                                                        |
+| `ruff`               | languages  | exact pin       | all                     | ruff, the generated Python SDK's formatter and linter (uv tool). Needs `uv`.                                         |
+| `rust`               | languages  | exact pin       | all                     | Rust via rustup (rustfmt and clippy), for the generated Rust SDK.                                                    |
+| `uv`                 | languages  | exact pin       | all                     | uv, the Python toolchain manager.                                                                                    |
+| `curl`               | release    | `latest` only   | all                     | HTTP client the install commands use (the OS package manager's current build). Needs `brew`, `choco`.                |
+| `git`                | release    | `latest` only   | all                     | Version control (the OS package manager's current build). Needs `brew`, `choco`.                                     |
+| `gh`                 | release    | exact pin       | all                     | GitHub CLI, for releases, PRs and the API.                                                                           |
+| `goreleaser`         | release    | exact pin       | all                     | Release automation for the generated Go CLI.                                                                         |
+| `cosign`             | release    | exact pin       | all                     | Sigstore signing for release artifacts.                                                                              |
+| `jq`                 | release    | exact pin       | all                     | JSON processor.                                                                                                      |
+| `pwsh`               | release    | exact pin       | all                     | PowerShell 7, for the generated Windows install scripts.                                                             |
+| `shellcheck`         | release    | exact pin       | all                     | Shell script linter, for the generated install scripts.                                                              |
+| `cf`                 | cloudflare | exact pin       | all                     | Cloudflare CLI: deploy, workers types, account operations (bun global, runs on node). Needs `bun`, `node`.           |
+| `cloudflared`        | cloudflare | exact pin       | all                     | Cloudflare Tunnel client, for remote bindings.                                                                       |
+| `atlas`              | database   | exact pin       | all                     | Atlas schema migrations.                                                                                             |
+| `sqld`               | database   | exact pin       | apt, dnf, pacman, macOS | libSQL server, for local database tests (no Windows build).                                                          |
+| `stripe`             | payments   | exact pin       | all                     | Stripe CLI, for local webhooks, fixtures and API calls.                                                              |
+| `chromium`           | browsers   | `latest` only   | apt, dnf, pacman        | Chromium, the browser rail fallback (Linux only: brew and choco ship no usable build).                               |
+| `docker`             | browsers   | `latest` only   | all                     | Container engine with its daemon (Docker Engine on Linux, Docker Desktop elsewhere). Needs `brew`, `choco`.          |
+| `lightpanda`         | browsers   | `latest` only   | apt, dnf, pacman, macOS | Lightpanda, the default headless browser rail (nightly; no Windows build).                                           |
+| `playwright`         | browsers   | exact pin       | all                     | Playwright's Chromium for browser tests (version = your @playwright/test). Needs `bun`.                              |
+| `claude`             | agents     | pin or `latest` | all                     | Claude Code CLI (native installer; self-updates unless DISABLE_AUTOUPDATER=1).                                       |
+| `codex`              | agents     | exact pin       | all                     | OpenAI Codex CLI (bun global, runs on node). Needs `bun`, `node`.                                                    |
+| `ffmpeg`             | agents     | `latest` only   | all                     | ffmpeg, for /listen mic capture and /speak playback (the OS package manager's current build). Needs `brew`, `choco`. |
+| `grok`               | agents     | pin or `latest` | all                     | Grok Build CLI by xAI (native installer).                                                                            |
+| `rtk`                | agents     | exact pin       | all                     | rtk, shell output compression behind the agent Bash hook.                                                            |
+| `sherpa-onnx`        | agents     | exact pin       | all                     | sherpa-onnx, free local speech-to-text and text-to-speech for /listen and /speak (onnxruntime bundled).              |
 
 Where things land:
 
 - Single binaries: `$HOME/.local/bin`, or `%LOCALAPPDATA%\bin` on Windows (added to the user PATH).
-- Toolchains that need their files together (go, node, java, gradle, dotnet, pwsh): `$HOME/.local/share/<tool>`, or `%LOCALAPPDATA%\Programs\<tool>`.
+- Toolchains that need their files together (go, node, java, gradle, dotnet, pwsh, sherpa-onnx): `$HOME/.local/share/<tool>`, or `%LOCALAPPDATA%\Programs\<tool>`.
 - Installers with their own home keep it: bun `~/.bun`, deno `~/.deno`, rust `~/.cargo`, grok `~/.grok`, claude and uv's Python and tools `~/.local/bin`.
 - Global JS CLIs (`cf`, `codex`) install with `bun i -g` into `~/.bun/bin`; their launchers run on `node`.
 
@@ -158,18 +161,18 @@ go: {
 Any other name is a custom dep and needs the full form. `defineConfig` checks each key: a version string under a custom name is a type error.
 
 ```ts
-"stripe-cli": {
-	description: "Stripe CLI",                      // required
-	version: "1.53.0",                              // required; "latest" allowed
+just: {
+	description: "just, a command runner",          // required
+	version: "1.59.0",                              // required; "latest" allowed
 	required: false,                                // required
 	os: {                                           // required, at least one key
 		all: "curl … {{version}} …",                  // every OS not listed
-		macos: "brew install stripe/stripe-cli/stripe",
+		macos: "brew install just",
 		windows: false,                               // explicitly unavailable
 	},
-	check: { command: "stripe version", pattern: "(\\d+\\.\\d+\\.\\d+)" }, // default "{{name}} --version"
+	check: { command: "just --version", pattern: "(\\d+\\.\\d+\\.\\d+)" }, // default "{{name}} --version"
 	dependsOn: ["curl"],
-	env: [{ path: "$HOME/.stripe/bin" }],
+	env: [{ path: "$HOME/.just/bin" }],
 }
 ```
 

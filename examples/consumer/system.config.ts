@@ -2,7 +2,7 @@ import { defineConfig } from "@workerstack/system"
 
 /**
  * The whole workerstack catalog at the versions the workerstack repos pin. Built-ins take a version only;
- * brew and choco are added because other deps need them. stripe-cli shows the custom form, atlas an override.
+ * brew and choco are added because other deps need them. just shows the custom form, atlas an override.
  */
 export default defineConfig({
 	deps: {
@@ -44,6 +44,9 @@ export default defineConfig({
 		},
 		sqld: "0.24.32",
 
+		/* payments */
+		stripe: "1.55.10",
+
 		/* containers and browsers */
 		chromium: "latest",
 		docker: "latest",
@@ -56,19 +59,20 @@ export default defineConfig({
 		ffmpeg: { required: false, version: "latest" },
 		grok: "latest",
 		rtk: "0.51.0",
+		"sherpa-onnx": "2.0.1",
 
 		/* not a workerstack tool: the full custom form, unchanged */
-		"stripe-cli": {
-			check: { command: "stripe version" },
-			description: "Stripe CLI, for local webhooks and billing fixtures",
+		just: {
+			description: "just, a command runner for project recipes",
 			os: {
-				"linux-apt":
-					"curl -fsSL https://github.com/stripe/stripe-cli/releases/download/v{{version}}/stripe_{{version}}_linux_x86_64.tar.gz | tar -xz -C /tmp && mkdir -p $HOME/.local/bin && mv /tmp/stripe $HOME/.local/bin/stripe",
-				macos: "brew install stripe/stripe-cli/stripe",
+				/* just names CPUs x86_64 and aarch64; macOS reports arm64 */
+				all: 'tmp="$(mktemp -d)" && curl -fsSL "https://github.com/casey/just/releases/download/{{version}}/just-{{version}}-$(uname -m)-unknown-linux-musl.tar.gz" | tar -xz -C "$tmp" && mkdir -p "$HOME/.local/bin" && install -m 755 "$tmp/just" "$HOME/.local/bin/just" && rm -rf "$tmp"',
+				macos:
+					'tmp="$(mktemp -d)" && curl -fsSL "https://github.com/casey/just/releases/download/{{version}}/just-{{version}}-$(uname -m | sed s/arm64/aarch64/)-apple-darwin.tar.gz" | tar -xz -C "$tmp" && mkdir -p "$HOME/.local/bin" && install -m 755 "$tmp/just" "$HOME/.local/bin/just" && rm -rf "$tmp"',
 				windows: false,
 			},
 			required: false,
-			version: "1.53.0",
+			version: "1.59.0",
 		},
 	},
 })
