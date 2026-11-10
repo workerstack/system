@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { BUILTIN_GROUPS, BUILTIN_NAMES, BUILTINS as NARROW } from "../../../src/builtins/index.ts"
+import { winTree } from "../../../src/builtins/recipes.ts"
 import { resolveDeps } from "../../../src/builtins/resolve.ts"
 import type { Arch, BuiltinDep } from "../../../src/builtins/types.ts"
 import { OS_TARGETS, type OsTarget } from "../../../src/config.ts"
@@ -35,7 +36,7 @@ describe("built-in catalog", () => {
 	it("has no name in two groups", () => {
 		const total = Object.values(BUILTIN_GROUPS).reduce((sum, group) => sum + Object.keys(group).length, 0)
 		expect(BUILTIN_NAMES.size).toBe(total)
-		expect(BUILTIN_NAMES.size).toBe(36)
+		expect(BUILTIN_NAMES.size).toBe(38)
 	})
 
 	it("names only catalog deps as prerequisites, and every prerequisite is installable somewhere", () => {
@@ -89,6 +90,20 @@ describe("built-in catalog", () => {
 	})
 })
 
+describe("winTree", () => {
+	it("unpacks tarballs with the system tar.exe and zips with Expand-Archive", () => {
+		const tarball = winTree("https://example.com/tool.tar.bz2", "$env:LOCALAPPDATA\\Programs\\tool", { nested: true })
+		expect(tarball).toContain(
+			'Invoke-WebRequest -UseBasicParsing "https://example.com/tool.tar.bz2" -OutFile "$t\\archive"',
+		)
+		expect(tarball).toContain('& "$env:SystemRoot\\System32\\tar.exe" -xf "$t\\archive" -C "$t\\x"')
+		expect(tarball).not.toContain("Expand-Archive")
+		const zip = winTree("https://example.com/tool.zip", "$env:LOCALAPPDATA\\Programs\\tool")
+		expect(zip).toContain('-OutFile "$t\\archive.zip"; Expand-Archive "$t\\archive.zip" "$t\\x"')
+		expect(zip).not.toContain("tar.exe")
+	})
+})
+
 describe("verified recipes", () => {
 	it("gh picks the release asset for each platform", () => {
 		expect(command("gh", "linux-apt", "x64", "2.102.0")).toContain(
@@ -101,6 +116,30 @@ describe("verified recipes", () => {
 	it("rtk uses the static musl build on x64 Linux and glibc on arm64", () => {
 		expect(command("rtk", "linux-dnf", "x64", "0.51.0")).toContain("rtk-x86_64-unknown-linux-musl.tar.gz")
 		expect(command("rtk", "linux-dnf", "arm64", "0.51.0")).toContain("rtk-aarch64-unknown-linux-gnu.tar.gz")
+	})
+
+	it("sherpa-onnx unpacks the shared CPU build per platform and puts its bin dir on PATH", () => {
+		const base = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1"
+		expect(command("sherpa-onnx", "linux-apt", "x64", "2.0.1")).toContain(`${base}-linux-x64-shared.tar.bz2`)
+		expect(command("sherpa-onnx", "linux-pacman", "arm64", "2.0.1")).toContain(
+			`${base}-linux-aarch64-shared-cpu.tar.bz2`,
+		)
+		expect(command("sherpa-onnx", "macos", "arm64", "2.0.1")).toContain(`${base}-osx-arm64-shared.tar.bz2`)
+		expect(command("sherpa-onnx", "macos", "x64", "2.0.1")).toContain(`${base}-osx-x64-shared.tar.bz2`)
+		expect(command("sherpa-onnx", "windows", "x64", "2.0.1")).toContain(`${base}-win-x64-shared-MT-Release.tar.bz2`)
+		expect(command("sherpa-onnx", "windows", "arm64", "2.0.1")).toContain(`${base}-win-arm64-shared-MT-Release.tar.bz2`)
+		const sherpa = BUILTINS["sherpa-onnx"] as BuiltinDep
+		expect(sherpa.check).toEqual({ command: "sherpa-onnx-version" })
+		expect(sherpa.env?.("linux-apt")).toEqual([{ path: "$HOME/.local/share/sherpa-onnx/bin" }])
+		expect(sherpa.env?.("windows")).toEqual([{ path: "$env:LOCALAPPDATA\\Programs\\sherpa-onnx\\bin" }])
+	})
+
+	it("stripe picks the release asset, with the x64 zip on Windows arm64", () => {
+		const base = "https://github.com/stripe/stripe-cli/releases/download/v1.55.10/stripe_1.55.10"
+		expect(command("stripe", "linux-dnf", "arm64", "1.55.10")).toContain(`${base}_linux_arm64.tar.gz`)
+		expect(command("stripe", "linux-apt", "x64", "1.55.10")).toContain(`${base}_linux_x86_64.tar.gz`)
+		expect(command("stripe", "macos", "x64", "1.55.10")).toContain(`${base}_mac-os_x86_64.tar.gz`)
+		expect(command("stripe", "windows", "arm64", "1.55.10")).toContain(`${base}_windows_x86_64.zip`)
 	})
 
 	it("java takes a feature major or an exact, URL-encoded release", () => {

@@ -115,15 +115,32 @@ export function winArchive(url: string, member: string, name: string): string {
 }
 
 /**
- * Unpack a whole zip into `dir` (replacing it) and put `dir\<bin>` on the user PATH.
- * `nested`: the zip holds one top folder, which becomes `dir`.
+ * Download `url` and unpack it into `$t\x`: Expand-Archive for .zip (it rejects any other extension), the
+ * system tar.exe (bsdtar: gzip, bzip2, xz) otherwise. Named by path, since Git's GNU tar can shadow it on PATH.
+ */
+function winExtract(url: string): string[] {
+	if (url.endsWith(".zip")) {
+		return [
+			`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive.zip"`,
+			'Expand-Archive "$t\\archive.zip" "$t\\x"',
+		]
+	}
+	return [
+		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive"`,
+		'New-Item -ItemType Directory "$t\\x" | Out-Null',
+		'& "$env:SystemRoot\\System32\\tar.exe" -xf "$t\\archive" -C "$t\\x"',
+	]
+}
+
+/**
+ * Unpack a whole zip or tarball into `dir` (replacing it) and put `dir\<bin>` on the user PATH.
+ * `nested`: the archive holds one top folder, which becomes `dir`.
  */
 export function winTree(url: string, dir: string, opts: { bin?: string; nested?: boolean } = {}): string {
 	return [
 		PS_PRELUDE,
 		...WIN_TEMP,
-		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive.zip"`,
-		'Expand-Archive "$t\\archive.zip" "$t\\x"',
+		...winExtract(url),
 		`if (Test-Path "${dir}") { Remove-Item -Recurse -Force "${dir}" }`,
 		`New-Item -ItemType Directory -Force (Split-Path "${dir}") | Out-Null`,
 		opts.nested

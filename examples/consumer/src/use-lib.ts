@@ -32,7 +32,7 @@ export function templated(): string {
 
 /* the config keeps each entry's own type: a built-in version string, a custom dep object */
 export const bunPin: string = config.deps.bun
-export const stripeVersion: string = config.deps["stripe-cli"].version
+export const justVersion: string = config.deps.just.version
 
 /* a key outside the catalog needs the full custom form */
 // @ts-expect-error a version string alone is only for built-in names

@@ -9,6 +9,7 @@ import { BROWSERS } from "./browsers.ts"
 import { CLOUDFLARE } from "./cloudflare.ts"
 import { DATABASE } from "./database.ts"
 import { LANGUAGES } from "./languages.ts"
+import { PAYMENTS } from "./payments.ts"
 import { RELEASE } from "./release.ts"
 import { RUNTIMES } from "./runtimes.ts"
 import type { BuiltinDep } from "./types.ts"
@@ -21,6 +22,7 @@ export const BUILTIN_GROUPS = {
 	release: RELEASE,
 	cloudflare: CLOUDFLARE,
 	database: DATABASE,
+	payments: PAYMENTS,
 	browsers: BROWSERS,
 	agents: AGENTS,
 } as const
@@ -32,6 +34,7 @@ export const BUILTINS = {
 	...RELEASE,
 	...CLOUDFLARE,
 	...DATABASE,
+	...PAYMENTS,
 	...BROWSERS,
 	...AGENTS,
 } satisfies Record<string, BuiltinDep>

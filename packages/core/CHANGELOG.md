@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `sherpa-onnx` built-in (agents): free local speech-to-text and text-to-speech for /listen and /speak. Prebuilt CPU builds with onnxruntime bundled for Linux, macOS and Windows on x64 and arm64, unpacked to `$HOME/.local/share/sherpa-onnx` (`%LOCALAPPDATA%\Programs\sherpa-onnx`) with its `bin` dir on PATH
+- `stripe` built-in in the new `payments` group: the Stripe CLI from its GitHub release on every OS (Windows on Arm runs the x64 build)
+- Windows tree installs unpack `.tar.gz`, `.tar.bz2` and `.tar.xz` with the system `tar.exe`, not only zips
+
 ## 0.3.0 - 2026-11-08
 
 ### Added

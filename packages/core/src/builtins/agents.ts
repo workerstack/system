@@ -1,8 +1,21 @@
 /**
- * Agent tooling: claude, codex, grok, rtk, ffmpeg.
+ * Agent tooling: claude, codex, grok, rtk, plus ffmpeg and sherpa-onnx for /listen and /speak.
  */
 
-import { archive, bunGlobal, LOCAL_BIN, localBinEnv, pick, ps, unix, winArchive } from "./recipes.ts"
+import {
+	archive,
+	bunGlobal,
+	LOCAL_BIN,
+	LOCAL_SHARE,
+	localBinEnv,
+	pick,
+	ps,
+	tree,
+	unix,
+	WIN_PROGRAMS,
+	winArchive,
+	winTree,
+} from "./recipes.ts"
 import type { BuiltinDep } from "./types.ts"
 
 /** The installer's version argument: none for latest, so it takes its default channel. */
@@ -33,7 +46,7 @@ export const AGENTS = {
 	ffmpeg: {
 		check: { command: "ffmpeg -version" },
 		dependsOn: ["brew", "choco"],
-		description: "ffmpeg, for /listen mic capture (the OS package manager's current build)",
+		description: "ffmpeg, for /listen mic capture and /speak playback (the OS package manager's current build)",
 		os: () => ({
 			"linux-apt": "sudo apt-get install -y ffmpeg",
 			"linux-dnf": "sudo dnf install -y ffmpeg-free",
@@ -66,6 +79,28 @@ export const AGENTS = {
 			return {
 				...unix(archive(`${base}-${linux}.tar.gz`, "rtk", "rtk"), archive(`${base}-${mac}.tar.gz`, "rtk", "rtk")),
 				windows: winArchive(`${base}-x86_64-pc-windows-msvc.zip`, "rtk.exe", "rtk"),
+			}
+		},
+		versions: "pinned",
+	},
+	"sherpa-onnx": {
+		check: { command: "sherpa-onnx-version" },
+		description:
+			"sherpa-onnx, free local speech-to-text and text-to-speech for /listen and /speak (onnxruntime bundled)",
+		env: (os) => [{ path: os === "windows" ? `${WIN_PROGRAMS}\\sherpa-onnx\\bin` : `${LOCAL_SHARE}/sherpa-onnx/bin` }],
+		os: ({ arch, version }) => {
+			const base = `https://github.com/k2-fsa/sherpa-onnx/releases/download/v${version}/sherpa-onnx-v${version}`
+			/* the shared CPU builds: small, and the binaries find lib/ next to bin/; MT links the C runtime statically */
+			const linux = pick(arch, { arm64: "linux-aarch64-shared-cpu", x64: "linux-x64-shared" })
+			const mac = pick(arch, { arm64: "osx-arm64-shared", x64: "osx-x64-shared" })
+			const win = pick(arch, { arm64: "win-arm64-shared-MT-Release", x64: "win-x64-shared-MT-Release" })
+			const dir = `${LOCAL_SHARE}/sherpa-onnx`
+			return {
+				...unix(
+					tree(`${base}-${linux}.tar.bz2`, dir, { nested: true }),
+					tree(`${base}-${mac}.tar.bz2`, dir, { nested: true }),
+				),
+				windows: winTree(`${base}-${win}.tar.bz2`, `${WIN_PROGRAMS}\\sherpa-onnx`, { bin: "bin", nested: true }),
 			}
 		},
 		versions: "pinned",
