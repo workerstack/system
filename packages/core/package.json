@@ -1,6 +1,6 @@
 {
 	"name": "@workerstack/system",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "Every OS dependency workerstack needs, installed by one command. Define deps in system.config.ts, run system install.",
 	"keywords": [
 		"cli",
