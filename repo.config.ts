@@ -4,5 +4,10 @@ export default defineConfig({
 	packs: ["agents", "docs"],
 	link: { push: "allow" },
 	workflow: "main",
-	agents: { hosts: ["claude", "codex", "antigravity", "grok", "cursor"] },
+	agents: {
+		defaultApproval: "ask",
+		defaultEffort: "fast",
+		defaultStrategy: "spawn-fast",
+		hosts: ["claude", "codex", "antigravity", "grok", "cursor"],
+	},
 })
