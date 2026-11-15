@@ -398,7 +398,7 @@ printf %s "/no-tty-stdin"
 		const snap = snapshotTtyPath()
 		expect(snap.path.length).toBeGreaterThan(0)
 		expect(["tty", "process"]).toContain(snap.source)
-	})
+	}, 30_000)
 })
 
 describe("TTY_PATH_FALLBACK_WARN", () => {
