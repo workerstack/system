@@ -1,5 +1,5 @@
+import { createRequire } from "node:module";
 import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   BUILTIN_NAMES,
@@ -14,7 +14,7 @@ import { expect, test } from "vitest";
 import { runCli } from "./helpers.ts";
 import { depOf, resolvedOn } from "./resolved.ts";
 
-const catalogPath = fileURLToPath(import.meta.resolve("@workerstack/system-example-consumer"));
+const catalogPath = createRequire(import.meta.url).resolve("@workerstack/system-example-consumer");
 const catalogDir = dirname(catalogPath);
 
 test("declares every built-in except the auto-added bootstraps, plus one custom dep", () => {
