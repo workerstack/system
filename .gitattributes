@@ -1,0 +1,9 @@
+# repo:generated ffee0b11
+* text=auto eol=lf
+.repo/.gitkeep linguist-generated
+.vscode/tasks.json linguist-generated
+bunfig.toml linguist-generated
+e2e/app/bunfig.toml linguist-generated
+examples/consumer/bunfig.toml linguist-generated
+packages/core/bunfig.toml linguist-generated
+# /repo:generated

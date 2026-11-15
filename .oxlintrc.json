@@ -4,17 +4,7 @@
 	"env": {
 		"node": true
 	},
-	"ignorePatterns": [
-		"dist/**",
-		"coverage/**",
-		"node_modules/**",
-		".agents/**",
-		".claude/**",
-		".codex/**",
-		".gemini/**",
-		".grok/**",
-		".rulesync/**"
-	],
+	"ignorePatterns": ["dist/**", "coverage/**", "node_modules/**"],
 	"categories": {
 		"correctness": "error",
 		"suspicious": "warn"
