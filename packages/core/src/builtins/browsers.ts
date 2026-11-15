@@ -3,6 +3,7 @@
  */
 
 import {
+	apt,
 	aur,
 	binary,
 	launcher,
@@ -37,7 +38,7 @@ export const BROWSERS = {
 			const mac = `${snapshots}/${pick(arch, { arm64: "Mac_Arm", x64: "Mac" })}`
 			const win = `${snapshots}/${pick(arch, { arm64: "Win_Arm64", x64: "Win_x64" })}`
 			return {
-				"linux-apt": "sudo apt-get install -y chromium || sudo snap install chromium",
+				"linux-apt": `${apt("chromium")} || sudo snap install chromium`,
 				/* Fedora names the binary chromium-browser; link the name check and the browser rail use */
 				"linux-dnf": `sudo dnf install -y chromium && mkdir -p "${LOCAL_BIN}" && ln -sf /usr/bin/chromium-browser "${LOCAL_BIN}/chromium"`,
 				"linux-pacman": "sudo pacman -S --noconfirm chromium",
@@ -71,7 +72,7 @@ export const BROWSERS = {
 	epiphany: {
 		description: "GNOME Web (Epiphany), the WebKit browser on Linux; Safari ships with macOS and cannot be installed",
 		os: () => ({
-			"linux-apt": "sudo apt-get install -y epiphany-browser",
+			"linux-apt": apt("epiphany-browser"),
 			"linux-dnf": "sudo dnf install -y epiphany",
 			"linux-pacman": "sudo pacman -S --noconfirm epiphany",
 			macos: false,
@@ -90,8 +91,7 @@ export const BROWSERS = {
 				'echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" | sudo tee /etc/apt/sources.list.d/mozilla.list > /dev/null',
 				/* outrank Ubuntu's firefox package, which only installs the snap */
 				"printf 'Package: *\\nPin: origin packages.mozilla.org\\nPin-Priority: 1000\\n' | sudo tee /etc/apt/preferences.d/mozilla > /dev/null",
-				"sudo apt-get update",
-				"sudo apt-get install -y firefox",
+				apt("firefox"),
 			].join(" && "),
 			"linux-dnf": "sudo dnf install -y firefox",
 			"linux-pacman": "sudo pacman -S --noconfirm firefox",
@@ -111,7 +111,8 @@ export const BROWSERS = {
 			return {
 				"linux-apt": linuxPackage(`${direct}_${pick(arch, { arm64: "arm64", x64: "amd64" })}.deb`, "deb"),
 				"linux-dnf": linuxPackage(`${direct}_${pick(arch, { arm64: "aarch64", x64: "x86_64" })}.rpm`, "rpm"),
-				"linux-pacman": aur("google-chrome"),
+				/* the AUR package names its launcher google-chrome-stable; Google's .deb and .rpm ship both names */
+				"linux-pacman": `${aur("google-chrome")} && mkdir -p "${LOCAL_BIN}" && ln -sf /usr/bin/google-chrome-stable "${LOCAL_BIN}/google-chrome"`,
 				/* the cask puts nothing on PATH */
 				macos: `brew install --cask google-chrome && ${launcher("google-chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")}`,
 				windows: "choco install googlechrome -y",

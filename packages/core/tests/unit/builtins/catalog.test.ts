@@ -101,16 +101,27 @@ function check(name: string, os: OsTarget) {
 
 describe("unix commands", () => {
 	it("all parse in bash", () => {
+		/* one bash for every command, each in its own function, so a syntax error names its line */
+		const labels: string[] = []
+		const script: string[] = []
 		for (const name of Object.keys(BUILTINS)) {
 			for (const os of OS_TARGETS.filter((target) => target !== "windows")) {
 				for (const arch of ARCHES) {
 					const cmd = command(name, os, arch)
 					if (cmd === undefined) continue
-					const result = spawnSync("bash", ["-n", "-c", cmd])
-					expect(result.status, `${name} on ${os} ${arch}: ${result.stderr}`).toBe(0)
+					labels.push(`${name} on ${os} ${arch}`)
+					script.push(`f${labels.length}() {\n${cmd}\n}`)
 				}
 			}
 		}
+		const result = spawnSync("bash", ["-n"], { encoding: "utf-8", input: script.join("\n") })
+		const line = Number(result.stderr.match(/line (\d+)/)?.[1] ?? 0)
+		const fn = script
+			.join("\n")
+			.split("\n")
+			.slice(0, line)
+			.findLast((text) => /^f\d+\(\) \{$/.test(text))
+		expect(result.status, `${labels[Number(fn?.slice(1, -5)) - 1]}: ${result.stderr}`).toBe(0)
 	})
 
 	it("launcher writes a script that runs its target with every argument", () => {
@@ -253,6 +264,9 @@ describe("verified recipes", () => {
 		expect(command("google-chrome", "linux-pacman")).toContain(
 			'git clone --depth 1 "https://aur.archlinux.org/google-chrome.git" "$tmp/google-chrome" && (cd "$tmp/google-chrome" && makepkg -si --noconfirm)',
 		)
+		expect(command("google-chrome", "linux-pacman")).toContain(
+			'ln -sf /usr/bin/google-chrome-stable "$HOME/.local/bin/google-chrome"',
+		)
 		expect(command("google-chrome", "macos")).toContain("brew install --cask google-chrome && ")
 		expect(command("google-chrome", "macos")).toContain(
 			'"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"',
@@ -276,7 +290,7 @@ describe("verified recipes", () => {
 	})
 
 	it("epiphany is Linux-only, under Debian's package name on apt", () => {
-		expect(command("epiphany", "linux-apt")).toBe("sudo apt-get install -y epiphany-browser")
+		expect(command("epiphany", "linux-apt")).toBe("sudo apt-get update && sudo apt-get install -y epiphany-browser")
 		expect(command("epiphany", "linux-dnf")).toBe("sudo dnf install -y epiphany")
 		expect(command("epiphany", "macos")).toBeUndefined()
 		expect(command("epiphany", "windows")).toBeUndefined()
@@ -286,6 +300,9 @@ describe("verified recipes", () => {
 		const update = "https://update.code.visualstudio.com"
 		expect(command("vscode", "linux-apt", "arm64", "1.95.0")).toContain(`${update}/1.95.0/linux-deb-arm64/stable`)
 		expect(command("vscode", "linux-dnf", "x64", "latest")).toContain(`${update}/latest/linux-rpm-x64/stable`)
+		expect(command("vscode", "linux-pacman", "x64", "1.95.0")).toMatch(
+			/^sudo pacman -S --needed --noconfirm alsa-lib gtk3 libsecret libxkbfile nss && /,
+		)
 		expect(command("vscode", "linux-pacman", "x64", "1.95.0")).toContain(`${update}/1.95.0/linux-x64/stable`)
 		expect(command("vscode", "linux-pacman", "x64", "1.95.0")).toContain(
 			'ln -sf "$HOME/.local/share/vscode/bin/code" "$HOME/.local/bin/code"',

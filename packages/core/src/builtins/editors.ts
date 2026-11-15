@@ -79,8 +79,8 @@ export const EDITORS = {
 			return {
 				"linux-apt": linuxPackage(url(`linux-deb-${arch}`), "deb"),
 				"linux-dnf": linuxPackage(url(`linux-rpm-${arch}`), "rpm"),
-				/* Arch's own `code` is Code - OSS without Microsoft's marketplace; use Microsoft's tarball */
-				"linux-pacman": tree(url(`linux-${arch}`), `${LOCAL_SHARE}/vscode`, { bins: ["bin/code"], nested: true }),
+				/* Arch's own `code` is Code - OSS without Microsoft's marketplace. Microsoft's tarball brings no libraries, so install the ones it links */
+				"linux-pacman": `sudo pacman -S --needed --noconfirm alsa-lib gtk3 libsecret libxkbfile nss && ${tree(url(`linux-${arch}`), `${LOCAL_SHARE}/vscode`, { bins: ["bin/code"], nested: true })}`,
 				macos: [
 					macApp(url("darwin-universal"), "Visual Studio Code.app"),
 					`mkdir -p "${LOCAL_BIN}"`,

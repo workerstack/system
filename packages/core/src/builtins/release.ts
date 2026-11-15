@@ -2,7 +2,7 @@
  * Release and CI tooling: git, gh, jq, curl, goreleaser, cosign, shellcheck, pwsh.
  */
 
-import { archive, binary, localBinEnv, pick, tree, unix, winArchive, winBinary, winTree } from "./recipes.ts"
+import { apt, archive, binary, localBinEnv, pick, tree, unix, winArchive, winBinary, winTree } from "./recipes.ts"
 import type { BuiltinDep } from "./types.ts"
 
 const GH = "https://github.com"
@@ -12,7 +12,7 @@ export const RELEASE = {
 		dependsOn: ["brew", "choco"],
 		description: "HTTP client the install commands use (the OS package manager's current build)",
 		os: () => ({
-			"linux-apt": "sudo apt-get install -y curl",
+			"linux-apt": apt("curl"),
 			"linux-dnf": "sudo dnf install -y curl",
 			"linux-pacman": "sudo pacman -S --noconfirm curl",
 			macos: "brew install curl",
@@ -24,7 +24,7 @@ export const RELEASE = {
 		dependsOn: ["brew", "choco"],
 		description: "Version control (the OS package manager's current build)",
 		os: () => ({
-			"linux-apt": "sudo apt-get install -y git",
+			"linux-apt": apt("git"),
 			"linux-dnf": "sudo dnf install -y git",
 			"linux-pacman": "sudo pacman -S --noconfirm git",
 			macos: "brew install git",

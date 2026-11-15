@@ -10,6 +10,7 @@
 
 ### Changed
 
+- apt installs refresh the package lists first, so a stale list on a fresh image no longer fails with 404
 - `chromium` now installs on macOS and Windows too, from the official Chromium snapshots, per user and without admin
 
 ## 0.4.0 - 2026-11-10

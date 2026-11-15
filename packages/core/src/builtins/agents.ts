@@ -3,6 +3,7 @@
  */
 
 import {
+	apt,
 	archive,
 	bunGlobal,
 	LOCAL_BIN,
@@ -48,7 +49,7 @@ export const AGENTS = {
 		dependsOn: ["brew", "choco"],
 		description: "ffmpeg, for /listen mic capture and /speak playback (the OS package manager's current build)",
 		os: () => ({
-			"linux-apt": "sudo apt-get install -y ffmpeg",
+			"linux-apt": apt("ffmpeg"),
 			"linux-dnf": "sudo dnf install -y ffmpeg-free",
 			"linux-pacman": "sudo pacman -S --noconfirm ffmpeg",
 			macos: "brew install ffmpeg",

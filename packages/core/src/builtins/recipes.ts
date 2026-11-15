@@ -48,10 +48,16 @@ export function launcher(name: string, target: string): string {
 	return `mkdir -p "${LOCAL_BIN}" && printf '#!/bin/sh\\nexec "%s" "$@"\\n' "${target}" > "${file}" && chmod +x "${file}"`
 }
 
+/** Install OS packages through apt, refreshing its package lists first: a stale list 404s on a moved package. */
+export function apt(...packages: string[]): string {
+	return `sudo apt-get update && sudo apt-get install -y ${packages.join(" ")}`
+}
+
 /** Download a vendor package and install it with its dependencies: `.deb` through apt, `.rpm` through dnf. */
 export function linuxPackage(url: string, kind: "deb" | "rpm"): string {
-	const install = kind === "deb" ? "sudo apt-get install -y" : "sudo dnf install -y"
-	return `tmp="$(mktemp -d)" && curl -fsSL "${url}" -o "$tmp/package.${kind}" && ${install} "$tmp/package.${kind}" && ${CLEANUP}`
+	const file = `"$tmp/package.${kind}"`
+	const install = kind === "deb" ? apt(file) : `sudo dnf install -y ${file}`
+	return `tmp="$(mktemp -d)" && curl -fsSL "${url}" -o ${file} && ${install} && ${CLEANUP}`
 }
 
 /** Build and install an AUR package. makepkg refuses root, so this runs as a normal user with sudo. */
