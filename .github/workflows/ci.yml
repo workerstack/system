@@ -107,7 +107,7 @@ jobs:
         if: runner.os == 'Windows'
         run: choco feature enable -n allowGlobalConfirmation
       - name: Install the ${{ matrix.group }} group
-        run: bun e2e/app/scripts/catalog-install.ts --group ${{ matrix.group }}
+        run: bun packages/playground/scripts/catalog-install.ts --group ${{ matrix.group }}
         env:
           WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS: "900000"
 
@@ -124,11 +124,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the ${{ matrix.distro }} image
-        run: docker build -f e2e/docker/linux-${{ matrix.distro }}.Dockerfile -t system-${{ matrix.distro }} .
+        run: docker build -f packages/playground/docker/linux-${{ matrix.distro }}.Dockerfile -t system-${{ matrix.distro }} .
       - name: Install the ${{ matrix.group }} group
         run: >
           docker run --rm -v "$PWD:/src" -w /src -e SHELL=/bin/bash
           -e WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS=900000
           --user builder
           system-${{ matrix.distro }}
-          bash -c "bun install --frozen-lockfile && bun e2e/app/scripts/catalog-install.ts --group ${{ matrix.group }}"
+          bash -c "bun install --frozen-lockfile && bun packages/playground/scripts/catalog-install.ts --group ${{ matrix.group }}"

@@ -19,35 +19,58 @@ order: 30
 A built-in name takes one of two forms:
 
 ```ts
-go: "1.27.2"
+import { defineConfig } from "@workerstack/system";
 
-go: {
-	version: "1.27.2",
-	required: false,                       // default true
-	description: "Go for the CLI",          // replaces the catalog's
-	os: { windows: false },                // merges per OS key over the catalog's commands
-	check: { command: "go version" },      // replaces
-	env: [{ path: "/opt/go/bin" }],        // replaces
-	dependsOn: [],                         // replaces
-}
+export default defineConfig({
+	deps: {
+		bun: "1.4.4",
+	},
+});
+```
+
+The long form overrides parts of the catalog entry:
+
+```ts
+import { defineConfig } from "@workerstack/system";
+
+export default defineConfig({
+	deps: {
+		go: {
+			version: "1.27.2",
+			required: false, // default true
+			description: "Go for the CLI", // replaces the catalog's
+			os: { windows: false }, // merges per OS key over the catalog's commands
+			check: { command: "go version" }, // replaces
+			env: [{ path: "/opt/go/bin" }], // replaces
+			dependsOn: [], // replaces
+		},
+	},
+});
 ```
 
 Any other name is a custom dep and needs the full form. `defineConfig` checks each key: a version string under a custom name is a type error.
 
 ```ts
-just: {
-	description: "just, a command runner",          // required
-	version: "1.59.0",                              // required; "latest" allowed
-	required: false,                                // required
-	os: {                                           // required, at least one key
-		all: "curl … {{version}} …",                  // every OS not listed
-		macos: "brew install just",
-		windows: false,                               // explicitly unavailable
+import { defineConfig } from "@workerstack/system";
+
+export default defineConfig({
+	deps: {
+		just: {
+			description: "just, a command runner", // required
+			version: "1.59.0", // required; "latest" allowed
+			required: false, // required
+			os: {
+				// required, at least one key
+				all: 'curl -fsSL "https://github.com/casey/just/releases/download/{{version}}/just-{{version}}-x86_64-unknown-linux-musl.tar.gz" | tar -xz -C "$HOME/.local/bin" just', // every OS not listed
+				macos: "brew install just",
+				windows: false, // explicitly unavailable
+			},
+			check: { command: "just --version", pattern: "(\\d+\\.\\d+\\.\\d+)" }, // default "{{name}} --version"
+			dependsOn: ["curl"],
+			env: [{ path: "$HOME/.local/bin" }],
+		},
 	},
-	check: { command: "just --version", pattern: "(\\d+\\.\\d+\\.\\d+)" }, // default "{{name}} --version"
-	dependsOn: ["curl"],
-	env: [{ path: "$HOME/.just/bin" }],
-}
+});
 ```
 
 `os` keys: `all`, `linux-apt`, `linux-dnf`, `linux-pacman`, `macos`, `windows`. An OS key overrides `all`, `false` makes the dep unavailable there, and a missing key without `all` means unavailable.

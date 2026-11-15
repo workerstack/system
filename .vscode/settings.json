@@ -84,10 +84,9 @@
     ".repo/.gitkeep": true,
     ".vscode/tasks.json": true,
     "bunfig.toml": true,
-    "e2e/app/bunfig.toml": true,
-    "examples/consumer/bunfig.toml": true,
     "knip.jsonc": true,
     "packages/core/README.md": true,
-    "packages/core/bunfig.toml": true
+    "packages/core/bunfig.toml": true,
+    "packages/playground/bunfig.toml": true
   }
 }

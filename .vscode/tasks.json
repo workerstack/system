@@ -132,50 +132,11 @@
       }
     },
     {
-      "label": "workerstack:system-e2e-app:test",
-      "type": "shell",
-      "command": "bun run test",
-      "options": {
-        "cwd": "${workspaceFolder}/e2e/app"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "workerstack:system-e2e-app:test:real-install",
-      "type": "shell",
-      "command": "bun run test:real-install",
-      "options": {
-        "cwd": "${workspaceFolder}/e2e/app"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "workerstack:system-e2e-app:typecheck",
-      "type": "shell",
-      "command": "bun run typecheck",
-      "options": {
-        "cwd": "${workspaceFolder}/e2e/app"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "workerstack:system-example-consumer:setup:deps",
+      "label": "workerstack:system-playground:setup:deps",
       "type": "shell",
       "command": "bun run setup:deps",
       "options": {
-        "cwd": "${workspaceFolder}/examples/consumer"
+        "cwd": "${workspaceFolder}/packages/playground"
       },
       "problemMatcher": [],
       "presentation": {
@@ -184,11 +145,11 @@
       }
     },
     {
-      "label": "workerstack:system-example-consumer:setup:deps:check",
+      "label": "workerstack:system-playground:setup:deps:check",
       "type": "shell",
       "command": "bun run setup:deps:check",
       "options": {
-        "cwd": "${workspaceFolder}/examples/consumer"
+        "cwd": "${workspaceFolder}/packages/playground"
       },
       "problemMatcher": [],
       "presentation": {
@@ -197,11 +158,37 @@
       }
     },
     {
-      "label": "workerstack:system-example-consumer:typecheck",
+      "label": "workerstack:system-playground:test",
+      "type": "shell",
+      "command": "bun run test",
+      "options": {
+        "cwd": "${workspaceFolder}/packages/playground"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "workerstack:system-playground:test:real-install",
+      "type": "shell",
+      "command": "bun run test:real-install",
+      "options": {
+        "cwd": "${workspaceFolder}/packages/playground"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "workerstack:system-playground:typecheck",
       "type": "shell",
       "command": "bun run typecheck",
       "options": {
-        "cwd": "${workspaceFolder}/examples/consumer"
+        "cwd": "${workspaceFolder}/packages/playground"
       },
       "problemMatcher": [],
       "presentation": {

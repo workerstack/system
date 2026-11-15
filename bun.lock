@@ -10,29 +10,6 @@
         "@workerstack/repo": "0.2.0",
       },
     },
-    "e2e/app": {
-      "name": "@workerstack/system-e2e-app",
-      "bin": {
-        "catalog-install": "./scripts/catalog-install.ts",
-      },
-      "dependencies": {
-        "@workerstack/system": "workspace:*",
-        "@workerstack/system-example-consumer": "workspace:*",
-      },
-      "devDependencies": {
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "examples/consumer": {
-      "name": "@workerstack/system-example-consumer",
-      "dependencies": {
-        "@workerstack/system": "workspace:*",
-      },
-      "devDependencies": {
-        "typescript": "catalog:",
-      },
-    },
     "packages/core": {
       "name": "@workerstack/system",
       "version": "0.4.0",
@@ -42,6 +19,19 @@
       "devDependencies": {
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/playground": {
+      "name": "@workerstack/system-playground",
+      "bin": {
+        "catalog-install": "./scripts/catalog-install.ts",
+      },
+      "dependencies": {
+        "@workerstack/system": "workspace:*",
+      },
+      "devDependencies": {
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -388,9 +378,7 @@
 
     "@workerstack/system": ["@workerstack/system@workspace:packages/core"],
 
-    "@workerstack/system-e2e-app": ["@workerstack/system-e2e-app@workspace:e2e/app"],
-
-    "@workerstack/system-example-consumer": ["@workerstack/system-example-consumer@workspace:examples/consumer"],
+    "@workerstack/system-playground": ["@workerstack/system-playground@workspace:packages/playground"],
 
     "age-encryption": ["age-encryption@0.3.1", "", { "dependencies": { "@noble/ciphers": "^2.1.1", "@noble/curves": "^2.0.1", "@noble/hashes": "^2.0.1", "@noble/post-quantum": "^0.5.3", "@scure/base": "^2.0.0" } }, "sha512-bYgd7lxM7tEANmb9bXf7xTFB3Qpq+JGKinVSdFh5MV+t2fJJZSTdKhWkvXTFJQGysZd+K9Dt3F+n+4DKazXlnQ=="],
 

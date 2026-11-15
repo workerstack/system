@@ -1,15 +1,13 @@
 # References
 
-<!-- repo:packages 597dd03a -->
-- [@workerstack/system-e2e-app](../e2e/app/references/INDEX.md): References
-- [@workerstack/system-example-consumer](../examples/consumer/references/INDEX.md): References
+<!-- repo:packages 81353d17 -->
 - [@workerstack/system](../packages/core/references/INDEX.md): References
+- [@workerstack/system-playground](../packages/playground/references/INDEX.md): References
 <!-- /repo:packages -->
 
-<!-- repo:stack e3e03690 -->
+<!-- repo:stack 3f8ba17c -->
 - [@workerstack/repo](../node_modules/@workerstack/repo/references/INDEX.md)
 - [@workerstack/system](../node_modules/@workerstack/system/references/INDEX.md)
-- [@workerstack/system-example-consumer](../node_modules/@workerstack/system-example-consumer/references/INDEX.md)
 <!-- /repo:stack -->
 
 <!-- repo:available 10ef8736 -->

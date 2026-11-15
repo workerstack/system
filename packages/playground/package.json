@@ -1,0 +1,27 @@
+{
+  "name": "@workerstack/system-playground",
+  "private": true,
+  "description": "A product that installs its OS dependencies with @workerstack/system imported the way a consumer imports it",
+  "bin": {
+    "catalog-install": "./scripts/catalog-install.ts"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./system.config.ts"
+  },
+  "scripts": {
+    "setup:deps": "system install",
+    "setup:deps:check": "system check",
+    "test": "bun --bun vitest run",
+    "test:real-install": "bun --bun vitest run -c vitest.real-install.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workerstack/system": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

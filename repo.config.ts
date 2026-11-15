@@ -14,7 +14,7 @@ export default defineConfig({
         rules: ["repo/no-unknown-parameters"],
       },
       {
-        files: ["e2e/app/src/catalog-install.ts"],
+        files: ["packages/playground/src/catalog-install.ts"],
         reason:
           "real installs run one at a time in dependsOn order: a dep needs its prerequisites installed first, " +
           "and apt, dnf, pacman, brew and choco each hold a lock",

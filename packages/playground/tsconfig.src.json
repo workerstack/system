@@ -1,0 +1,14 @@
+{
+  // exclude replaces tsconfig.json's own: its entries, then the tests, the fixtures and the tool-loaded config files
+  "exclude": [
+    "node_modules",
+    ".tmp",
+    "src/**/*.test.ts",
+    "src/real-install.e2e.ts",
+    "src/helpers.ts",
+    "src/resolved.ts",
+    "src/__fixtures__/**",
+    "*.config.ts"
+  ],
+  "extends": ["./tsconfig.json", "@workerstack/repo/tsconfig/strict"]
+}

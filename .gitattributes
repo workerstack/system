@@ -1,4 +1,4 @@
-# repo:generated b6065ab0
+# repo:generated eccd256c
 * text=auto eol=lf
 .githooks/commit-msg linguist-generated
 .githooks/pre-commit linguist-generated
@@ -7,8 +7,7 @@
 .repo/.gitkeep linguist-generated
 .vscode/tasks.json linguist-generated
 bunfig.toml linguist-generated
-e2e/app/bunfig.toml linguist-generated
-examples/consumer/bunfig.toml linguist-generated
 packages/core/README.md linguist-generated
 packages/core/bunfig.toml linguist-generated
+packages/playground/bunfig.toml linguist-generated
 # /repo:generated

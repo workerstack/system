@@ -24,12 +24,18 @@
     "system": "./src/bin.ts"
   },
   "files": [
-    "src"
+    "src",
+    "references",
+    "!src/**/*.test.ts",
+    "!src/fake-runtime.ts",
+    "!src/commands/context.ts",
+    "!src/builtins/catalog-fixtures.ts"
   ],
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./references/*": "./references/*"
   },
   "publishConfig": {
     "access": "public"

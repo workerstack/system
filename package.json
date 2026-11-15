@@ -3,9 +3,7 @@
   "private": true,
   "workspaces": {
     "packages": [
-      "packages/*",
-      "examples/*",
-      "e2e/*"
+      "packages/*"
     ],
     "catalog": {
       "@types/node": "26.1.1",
@@ -22,10 +20,10 @@
     "lint:fix": "repo lint --fix",
     "postinstall": "repo sync --postinstall",
     "test": "bun run --filter @workerstack/system test",
-    "test:catalog-install": "bun e2e/app/scripts/catalog-install.ts",
-    "test:consumers": "bun run --cwd e2e/app test",
-    "test:real-install": "bun run --cwd e2e/app test:real-install",
-    "test:e2e:docker": "bash e2e/docker/run.sh",
+    "test:catalog-install": "bun packages/playground/scripts/catalog-install.ts",
+    "test:consumers": "bun run --cwd packages/playground test",
+    "test:real-install": "bun run --cwd packages/playground test:real-install",
+    "test:e2e:docker": "bash packages/playground/docker/run.sh",
     "test:unit": "bun run --filter @workerstack/system test:unit",
     "test:watch": "bun run --filter @workerstack/system test:watch",
     "typecheck": "bun run --filter '*' typecheck"
