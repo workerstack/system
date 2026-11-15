@@ -17,7 +17,7 @@ function expand(builtin: BuiltinDep, entry: BuiltinOverride | string, arch: Arch
 		required: o.required ?? true,
 		version: o.version,
 	}
-	const check = o.check ?? builtin.check
+	const check = o.check ?? (typeof builtin.check === "function" ? builtin.check(os) : builtin.check)
 	const dependsOn = o.dependsOn ?? builtin.dependsOn
 	const env = o.env ?? builtin.env?.(os)
 	if (check) config.check = check

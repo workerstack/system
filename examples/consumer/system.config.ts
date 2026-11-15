@@ -50,8 +50,15 @@ export default defineConfig({
 		/* containers and browsers */
 		chromium: "latest",
 		docker: "latest",
+		epiphany: "latest",
+		firefox: "latest",
+		"google-chrome": "latest",
 		lightpanda: "latest",
 		playwright: "1.65.0",
+
+		/* editors */
+		t3code: "0.1.9",
+		vscode: "latest",
 
 		/* agents */
 		claude: "latest",

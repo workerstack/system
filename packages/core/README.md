@@ -20,12 +20,12 @@ This README is the full usage contract. Agents: read it end to end before writin
 
 ## Requirements
 
-| Need | Detail                                                                                                                                      |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bun  | The CLI is TypeScript with `#!/usr/bin/env bun`. bun is the only supported package manager.                                                 |
-| OS   | macOS, Linux with apt, dnf or pacman, Windows (PowerShell).                                                                                 |
-| CPU  | Built-ins ship x64 and arm64 recipes. Custom deps run anywhere.                                                                             |
-| sudo | Only OS packages use it (`git`, `curl`, `chromium`, `ffmpeg`, `docker` on Linux, playwright's apt deps). Everything else installs per user. |
+| Need | Detail                                                                                                                                                                                    |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bun  | The CLI is TypeScript with `#!/usr/bin/env bun`. bun is the only supported package manager.                                                                                               |
+| OS   | macOS, Linux with apt, dnf or pacman, Windows (PowerShell).                                                                                                                               |
+| CPU  | Built-ins ship x64 and arm64 recipes. Custom deps run anywhere.                                                                                                                           |
+| sudo | Only OS packages use it (`git`, `curl`, `ffmpeg`, `docker` on Linux, the Linux browsers, `vscode` and `t3code` on apt and dnf, playwright's apt deps). Everything else installs per user. |
 
 ## Quick start
 
@@ -98,10 +98,15 @@ A built-in takes only a version. The catalog supplies install commands for every
 | `atlas`              | database   | exact pin       | all                     | Atlas schema migrations.                                                                                             |
 | `sqld`               | database   | exact pin       | apt, dnf, pacman, macOS | libSQL server, for local database tests (no Windows build).                                                          |
 | `stripe`             | payments   | exact pin       | all                     | Stripe CLI, for local webhooks, fixtures and API calls.                                                              |
-| `chromium`           | browsers   | `latest` only   | apt, dnf, pacman        | Chromium, the browser rail fallback (Linux only: brew and choco ship no usable build).                               |
+| `chromium`           | browsers   | `latest` only   | all                     | Chromium, the browser rail fallback (distro package on Linux, the official snapshot elsewhere).                      |
 | `docker`             | browsers   | `latest` only   | all                     | Container engine with its daemon (Docker Engine on Linux, Docker Desktop elsewhere). Needs `brew`, `choco`.          |
+| `epiphany`           | browsers   | `latest` only   | apt, dnf, pacman        | GNOME Web (Epiphany), the WebKit browser on Linux; Safari ships with macOS and cannot be installed.                  |
+| `firefox`            | browsers   | `latest` only   | all                     | Mozilla Firefox (Mozilla's own APT repo on Debian and Ubuntu, never the snap). Needs `brew`, `choco`.                |
+| `google-chrome`      | browsers   | `latest` only   | all                     | Google Chrome (Google's package on Linux, built from the AUR on Arch). Needs `brew`, `choco`.                        |
 | `lightpanda`         | browsers   | `latest` only   | apt, dnf, pacman, macOS | Lightpanda, the default headless browser rail (nightly; no Windows build).                                           |
 | `playwright`         | browsers   | exact pin       | all                     | Playwright's Chromium for browser tests (version = your @playwright/test). Needs `bun`.                              |
+| `t3code`             | editors    | exact pin       | all                     | T3 Code, the desktop GUI for coding agents (pin a release; it updates itself after that).                            |
+| `vscode`             | editors    | pin or `latest` | all                     | Visual Studio Code, any release or latest (it updates itself on macOS and Windows).                                  |
 | `claude`             | agents     | pin or `latest` | all                     | Claude Code CLI (native installer; self-updates unless DISABLE_AUTOUPDATER=1).                                       |
 | `codex`              | agents     | exact pin       | all                     | OpenAI Codex CLI (bun global, runs on node). Needs `bun`, `node`.                                                    |
 | `ffmpeg`             | agents     | `latest` only   | all                     | ffmpeg, for /listen mic capture and /speak playback (the OS package manager's current build). Needs `brew`, `choco`. |
@@ -311,7 +316,11 @@ Types: `SystemConfig`, `DepEntry`, `SystemDepConfig`, `OsCommands`, `OsTarget`, 
 - `docker` on Linux adds you to the `docker` group. Log out and back in before using it without sudo.
 - `playwright` installs OS libraries only on apt (`--with-deps`); on dnf, pacman, macOS and Windows it installs the browser alone.
 - `claude` and `grok` update themselves. Pin them only when you need a fixed version, and set `DISABLE_AUTOUPDATER=1` for claude.
-- `chromium` is Linux-only, and on Ubuntu apt hands it to snap.
+- `chromium` on Ubuntu apt hands the install to snap. On macOS and Windows it is the newest official snapshot, which never updates itself: run `install chromium --upgrade` for a new one.
+- `google-chrome` on Arch builds the AUR package with `makepkg`, which refuses root. Run it as a normal user with sudo.
+- Safari has no built-in. It ships with macOS, and only macOS updates change it.
+- `vscode` and `t3code` update themselves, so a pin is where they start, not where they stay. `check` reports the newer version after an update.
+- `t3code` on dnf and pacman is the release AppImage, which needs FUSE to start.
 - A new terminal (or `source` of the rc file) picks up PATH changes; `system check` already reads a new shell's PATH.
 
 ## Changelog

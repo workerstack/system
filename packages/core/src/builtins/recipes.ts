@@ -12,6 +12,8 @@ export const LOCAL_SHARE = "$HOME/.local/share"
 export const WIN_BIN = "$env:LOCALAPPDATA\\bin"
 export const WIN_PROGRAMS = "$env:LOCALAPPDATA\\Programs"
 
+const CLEANUP = 'rm -rf "$tmp"'
+
 /** The same command on every Linux distro, and one for macOS. */
 export function unix(linux: string, macos: string): OsCommands {
 	return { "linux-apt": linux, "linux-dnf": linux, "linux-pacman": linux, macos }
@@ -37,6 +39,58 @@ export function binary(url: string, name: string): string {
 	return `mkdir -p "${LOCAL_BIN}" && curl -fsSL "${url}" -o "${LOCAL_BIN}/${name}" && chmod +x "${LOCAL_BIN}/${name}"`
 }
 
+/**
+ * A `$HOME/.local/bin/<name>` script that runs `target` (expanded at install time). For app executables
+ * that look up their bundle beside themselves, so a symlink would break them.
+ */
+export function launcher(name: string, target: string): string {
+	const file = `${LOCAL_BIN}/${name}`
+	return `mkdir -p "${LOCAL_BIN}" && printf '#!/bin/sh\\nexec "%s" "$@"\\n' "${target}" > "${file}" && chmod +x "${file}"`
+}
+
+/** Download a vendor package and install it with its dependencies: `.deb` through apt, `.rpm` through dnf. */
+export function linuxPackage(url: string, kind: "deb" | "rpm"): string {
+	const install = kind === "deb" ? "sudo apt-get install -y" : "sudo dnf install -y"
+	return `tmp="$(mktemp -d)" && curl -fsSL "${url}" -o "$tmp/package.${kind}" && ${install} "$tmp/package.${kind}" && ${CLEANUP}`
+}
+
+/** Build and install an AUR package. makepkg refuses root, so this runs as a normal user with sudo. */
+export function aur(pkg: string): string {
+	return [
+		"sudo pacman -S --needed --noconfirm base-devel git",
+		'tmp="$(mktemp -d)"',
+		`git clone --depth 1 "https://aur.archlinux.org/${pkg}.git" "$tmp/${pkg}"`,
+		`(cd "$tmp/${pkg}" && makepkg -si --noconfirm)`,
+		CLEANUP,
+	].join(" && ")
+}
+
+/** Download a macOS app zip and put its one `.app` into `$HOME/Applications` (replacing it). ditto keeps the bundle's symlinks. */
+export function macApp(url: string, app: string): string {
+	return [
+		'tmp="$(mktemp -d)"',
+		`curl -fsSL "${url}" -o "$tmp/app.zip"`,
+		'ditto -x -k "$tmp/app.zip" "$tmp/x"',
+		`rm -rf "$HOME/Applications/${app}"`,
+		'mkdir -p "$HOME/Applications"',
+		`mv "$(find "$tmp/x" -maxdepth 2 -name "*.app" | head -n 1)" "$HOME/Applications/${app}"`,
+		CLEANUP,
+	].join(" && ")
+}
+
+/**
+ * A Windows check that prints a file or registry value through PowerShell. It runs from cmd.exe, which
+ * expands `%VAR%`; the single quotes keep paths with spaces whole.
+ */
+export function winVersionCheck(expression: string): { command: string } {
+	return { command: `powershell -NoProfile -Command "${expression}"` }
+}
+
+/** The product version of an installed .exe, for GUI apps whose `--version` prints nothing on Windows. */
+export function winExeVersion(path: string): { command: string } {
+	return winVersionCheck(`(Get-Item '${path}').VersionInfo.ProductVersion`)
+}
+
 /** Unpack `$tmp/archive` into `$tmp/x`: unzip for .zip (GNU tar cannot), tar otherwise. */
 function extract(url: string): string {
 	if (url.endsWith(".zip")) return 'unzip -q "$tmp/archive" -d "$tmp/x"'
@@ -47,8 +101,6 @@ function extract(url: string): string {
 function download(url: string): string[] {
 	return ['tmp="$(mktemp -d)"', `curl -fsSL "${url}" -o "$tmp/archive"`, 'mkdir "$tmp/x"', extract(url)]
 }
-
-const CLEANUP = 'rm -rf "$tmp"'
 
 /** Download an archive and install `member` (a path inside it) as `$HOME/.local/bin/<name>`. */
 export function archive(url: string, member: string, name: string): string {
@@ -148,6 +200,18 @@ export function winTree(url: string, dir: string, opts: { bin?: string; nested?:
 			: `Move-Item "$t\\x" "${dir}"`,
 		"Remove-Item -Recurse -Force $t",
 		winPathDir(opts.bin ? `${dir}\\${opts.bin}` : dir),
+	].join("; ")
+}
+
+/** Download a Windows installer and run it with `args` (its silent switches); fail on a non-zero exit. */
+export function winInstaller(url: string, args: readonly string[]): string {
+	return [
+		PS_PRELUDE,
+		...WIN_TEMP,
+		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\setup.exe"`,
+		`$p = Start-Process -Wait -PassThru -FilePath "$t\\setup.exe" -ArgumentList ${args.map((arg) => `'${arg}'`).join(",")}`,
+		'if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }',
+		"Remove-Item -Recurse -Force $t",
 	].join("; ")
 }
 

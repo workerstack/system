@@ -29,9 +29,9 @@ describe("workerstack catalog — every built-in and the custom form", () => {
 		expect(declared.filter((name) => !BUILTIN_NAMES.has(name))).toEqual(["just"])
 	})
 
-	test("resolves to 39 deps with brew and choco added", () => {
+	test("resolves to 44 deps with brew and choco added", () => {
 		const deps = resolvedOn("linux-apt")
-		expect(Object.keys(deps).length).toBe(39)
+		expect(Object.keys(deps).length).toBe(44)
 		expect(deps.brew?.version).toBe("latest")
 		expect(deps.choco?.version).toBe("latest")
 	})
@@ -57,7 +57,7 @@ describe("workerstack catalog — every built-in and the custom form", () => {
 		for (const dep of ["ruff", "mypy", "python"]) before("uv", dep)
 		for (const dep of ["gradle", "google-java-format"]) before("java", dep)
 		for (const dep of ["cf", "codex", "playwright"]) before("bun", dep)
-		for (const dep of ["git", "curl", "docker", "ffmpeg"]) before("brew", dep)
+		for (const dep of ["git", "curl", "docker", "ffmpeg", "google-chrome", "firefox"]) before("brew", dep)
 	})
 
 	test("the atlas override keeps the catalog's commands and replaces the description", () => {
@@ -93,7 +93,7 @@ describe("CLI dry-run of the workerstack catalog", () => {
 		const result = await runCli(["install", "--dry-run", "--config", catalogPath], { cwd: catalogDir })
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).toContain("Dry-run complete")
-		expect(result.stdout).toContain("Found 39 dependencies")
+		expect(result.stdout).toContain("Found 44 dependencies")
 	})
 
 	test("walks every OS target", async () => {
@@ -112,7 +112,7 @@ describe("CLI dry-run of the workerstack catalog", () => {
 			cwd: catalogDir,
 			env: { WORKERSTACK_SYSTEM_OS: undefined },
 		})
-		expect(result.stdout).toContain("chromium@latest — not available on windows")
+		expect(result.stdout).toContain("epiphany@latest — not available on windows")
 		expect(result.stdout).toContain("sqld@0.24.32 — not available on windows")
 		expect(result.stdout).toContain("$env:LOCALAPPDATA\\bin")
 		expect(result.stdout).toContain("choco install git -y")

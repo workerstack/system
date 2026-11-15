@@ -1,6 +1,7 @@
 FROM archlinux:base
 RUN pacman -Syu --noconfirm curl unzip tar xz bash sudo git which \
 	&& pacman -Scc --noconfirm
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4"
-ENV PATH="/root/.bun/bin:${PATH}"
+# makepkg refuses root, so AUR installs run as this user. uid 1001 is the GitHub runner's, which keeps the mounted checkout writable.
+RUN useradd -m -u 1001 builder && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v1.4.4"
 WORKDIR /src

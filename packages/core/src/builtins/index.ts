@@ -8,6 +8,7 @@ import { BOOTSTRAP } from "./bootstrap.ts"
 import { BROWSERS } from "./browsers.ts"
 import { CLOUDFLARE } from "./cloudflare.ts"
 import { DATABASE } from "./database.ts"
+import { EDITORS } from "./editors.ts"
 import { LANGUAGES } from "./languages.ts"
 import { PAYMENTS } from "./payments.ts"
 import { RELEASE } from "./release.ts"
@@ -24,6 +25,7 @@ export const BUILTIN_GROUPS = {
 	database: DATABASE,
 	payments: PAYMENTS,
 	browsers: BROWSERS,
+	editors: EDITORS,
 	agents: AGENTS,
 } as const
 
@@ -36,6 +38,7 @@ export const BUILTINS = {
 	...DATABASE,
 	...PAYMENTS,
 	...BROWSERS,
+	...EDITORS,
 	...AGENTS,
 } satisfies Record<string, BuiltinDep>
 

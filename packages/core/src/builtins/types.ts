@@ -10,8 +10,11 @@ export interface RecipeContext {
 
 /** A tool workerstack supports by name: the config gives a version, the catalog gives the rest. */
 export interface BuiltinDep {
-	/** `check` runs this; default `<name> --version` */
-	check?: SystemDepConfig["check"]
+	/**
+	 * `check` runs this; default `<name> --version`. A function gives the check for the OS the config resolves on,
+	 * for apps whose version lives in a bundle or file, not on stdout.
+	 */
+	check?: SystemDepConfig["check"] | ((os: OsTarget) => SystemDepConfig["check"])
 	/** Other deps installed first. A `latest`-only built-in missing from the config is added; any other is an error. */
 	dependsOn?: readonly string[]
 	description: string

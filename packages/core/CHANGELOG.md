@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `google-chrome`, `firefox` and `epiphany` (GNOME Web) built-ins in `browsers`. Chrome uses Google's `.deb` or `.rpm` on Linux and the AUR on Arch, Firefox uses Mozilla's own APT repo on Debian and Ubuntu, and both use brew casks and choco elsewhere. GNOME Web is Linux-only. Safari has no built-in: it cannot be installed
+- `vscode` and `t3code` built-ins in the new `editors` group. VS Code takes any release or `latest` from Microsoft's own downloads on every OS. T3 Code installs a pinned GitHub release: the `.deb` on apt, the AppImage with a launcher and desktop entry on dnf and pacman, the app in `~/Applications` on macOS, and the per-user installer on Windows
+- A built-in's `check` can differ per OS, so GUI apps report their version from the `.exe`, the package or the app bundle without opening a window
+
+### Changed
+
+- `chromium` now installs on macOS and Windows too, from the official Chromium snapshots, per user and without admin
+
 ## 0.4.0 - 2026-11-10
 
 ### Added

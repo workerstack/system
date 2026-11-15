@@ -1,8 +1,20 @@
 /**
- * Containers and browsers: docker, chromium, lightpanda, playwright.
+ * Containers and browsers: docker, chromium, google-chrome, firefox, epiphany, lightpanda, playwright.
  */
 
-import { binary, LOCAL_BIN, localBinEnv, pick } from "./recipes.ts"
+import {
+	aur,
+	binary,
+	launcher,
+	LOCAL_BIN,
+	localBinEnv,
+	linuxPackage,
+	macApp,
+	pick,
+	WIN_PROGRAMS,
+	winExeVersion,
+	winTree,
+} from "./recipes.ts"
 import type { BuiltinDep } from "./types.ts"
 
 /**
@@ -16,16 +28,31 @@ const PLAYWRIGHT_CHECK =
 
 export const BROWSERS = {
 	chromium: {
-		description: "Chromium, the browser rail fallback (Linux only: brew and choco ship no usable build)",
-		env: localBinEnv,
-		os: () => ({
-			"linux-apt": "sudo apt-get install -y chromium || sudo snap install chromium",
-			/* Fedora names the binary chromium-browser; link the name check and the browser rail use */
-			"linux-dnf": `sudo dnf install -y chromium && mkdir -p "${LOCAL_BIN}" && ln -sf /usr/bin/chromium-browser "${LOCAL_BIN}/chromium"`,
-			"linux-pacman": "sudo pacman -S --noconfirm chromium",
-			macos: false,
-			windows: false,
-		}),
+		check: (os) => (os === "windows" ? winExeVersion("%LOCALAPPDATA%\\Programs\\chromium\\chrome.exe") : undefined),
+		description: "Chromium, the browser rail fallback (distro package on Linux, the official snapshot elsewhere)",
+		env: (os) => (os === "windows" ? [{ path: `${WIN_PROGRAMS}\\chromium` }] : localBinEnv(os)),
+		os: ({ arch }) => {
+			/* brew's cask is disabled and choco's lags; both only repackaged these snapshots */
+			const snapshots = "https://storage.googleapis.com/chromium-browser-snapshots"
+			const mac = `${snapshots}/${pick(arch, { arm64: "Mac_Arm", x64: "Mac" })}`
+			const win = `${snapshots}/${pick(arch, { arm64: "Win_Arm64", x64: "Win_x64" })}`
+			return {
+				"linux-apt": "sudo apt-get install -y chromium || sudo snap install chromium",
+				/* Fedora names the binary chromium-browser; link the name check and the browser rail use */
+				"linux-dnf": `sudo dnf install -y chromium && mkdir -p "${LOCAL_BIN}" && ln -sf /usr/bin/chromium-browser "${LOCAL_BIN}/chromium"`,
+				"linux-pacman": "sudo pacman -S --noconfirm chromium",
+				macos: [
+					`rev="$(curl -fsSL "${mac}/LAST_CHANGE")"`,
+					macApp(`${mac}/$rev/chrome-mac.zip`, "Chromium.app"),
+					launcher("chromium", "$HOME/Applications/Chromium.app/Contents/MacOS/Chromium"),
+				].join(" && "),
+				windows: winTree(
+					`${win}/$(Invoke-RestMethod '${win}/LAST_CHANGE')/chrome-win.zip`,
+					`${WIN_PROGRAMS}\\chromium`,
+					{ nested: true },
+				),
+			}
+		},
 		versions: "latest",
 	},
 	docker: {
@@ -39,6 +66,57 @@ export const BROWSERS = {
 			macos: "brew install --cask docker-desktop",
 			windows: "choco install docker-desktop -y",
 		}),
+		versions: "latest",
+	},
+	epiphany: {
+		description: "GNOME Web (Epiphany), the WebKit browser on Linux; Safari ships with macOS and cannot be installed",
+		os: () => ({
+			"linux-apt": "sudo apt-get install -y epiphany-browser",
+			"linux-dnf": "sudo dnf install -y epiphany",
+			"linux-pacman": "sudo pacman -S --noconfirm epiphany",
+			macos: false,
+			windows: false,
+		}),
+		versions: "latest",
+	},
+	firefox: {
+		check: (os) => (os === "windows" ? winExeVersion("%ProgramFiles%\\Mozilla Firefox\\firefox.exe") : undefined),
+		dependsOn: ["brew", "choco"],
+		description: "Mozilla Firefox (Mozilla's own APT repo on Debian and Ubuntu, never the snap)",
+		os: () => ({
+			"linux-apt": [
+				"sudo install -d -m 0755 /etc/apt/keyrings",
+				"curl -fsSL https://packages.mozilla.org/apt/repo-signing-key.gpg | sudo tee /etc/apt/keyrings/packages.mozilla.org.asc > /dev/null",
+				'echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" | sudo tee /etc/apt/sources.list.d/mozilla.list > /dev/null',
+				/* outrank Ubuntu's firefox package, which only installs the snap */
+				"printf 'Package: *\\nPin: origin packages.mozilla.org\\nPin-Priority: 1000\\n' | sudo tee /etc/apt/preferences.d/mozilla > /dev/null",
+				"sudo apt-get update",
+				"sudo apt-get install -y firefox",
+			].join(" && "),
+			"linux-dnf": "sudo dnf install -y firefox",
+			"linux-pacman": "sudo pacman -S --noconfirm firefox",
+			macos: "brew install --cask firefox",
+			windows: "choco install firefox -y",
+		}),
+		versions: "latest",
+	},
+	"google-chrome": {
+		check: (os) =>
+			os === "windows" ? winExeVersion("%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe") : undefined,
+		dependsOn: ["brew", "choco"],
+		description: "Google Chrome (Google's package on Linux, built from the AUR on Arch)",
+		env: localBinEnv,
+		os: ({ arch }) => {
+			const direct = "https://dl.google.com/linux/direct/google-chrome-stable_current"
+			return {
+				"linux-apt": linuxPackage(`${direct}_${pick(arch, { arm64: "arm64", x64: "amd64" })}.deb`, "deb"),
+				"linux-dnf": linuxPackage(`${direct}_${pick(arch, { arm64: "aarch64", x64: "x86_64" })}.rpm`, "rpm"),
+				"linux-pacman": aur("google-chrome"),
+				/* the cask puts nothing on PATH */
+				macos: `brew install --cask google-chrome && ${launcher("google-chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")}`,
+				windows: "choco install googlechrome -y",
+			}
+		},
 		versions: "latest",
 	},
 	lightpanda: {

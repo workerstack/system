@@ -45,6 +45,27 @@ describe("resolveDeps", () => {
 		])
 	})
 
+	it("resolves a per-OS check for the target OS, and an override's check wins", () => {
+		const perOs: Record<string, BuiltinDep> = {
+			app: {
+				check: (os) => ({ command: os === "windows" ? "app-win --ver" : "app --version" }),
+				description: "an app",
+				os: () => ({ all: "get app" }),
+				versions: "latest",
+			},
+		}
+		expect(resolveDeps({ app: "latest" }, { arch: "x64", os: "windows" }, perOs).app?.check).toEqual({
+			command: "app-win --ver",
+		})
+		expect(resolveDeps({ app: "latest" }, { arch: "x64", os: "macos" }, perOs).app?.check).toEqual({
+			command: "app --version",
+		})
+		const override = { check: { command: "mine" }, version: "latest" }
+		expect(resolveDeps({ app: override }, { arch: "x64", os: "windows" }, perOs).app?.check).toEqual({
+			command: "mine",
+		})
+	})
+
 	it("merges an override's os per key and replaces every other field", () => {
 		const deps = resolveDeps(
 			{
