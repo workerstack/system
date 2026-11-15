@@ -45,11 +45,10 @@ assume it can.
 From the repo root; CI runs the same set, with `fmt:check` in place of `fmt`.
 
     bun run fmt          # oxfmt, rewrites in place
-    bun run lint         # oxlint
+    bun repo check       # lint, knip, tsconfigs, manifests; the pre-commit hook runs it
     bun run typecheck
-    bun run typecheck:consumers
     bun run test
     bun run test:consumers
 
 The Docker and catalog-install e2e suites (`test:e2e:docker`,
-`test:catalog-install`) are slow — CI only.
+`test:catalog-install`, `test:real-install`) are slow — CI only.

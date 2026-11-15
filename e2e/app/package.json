@@ -1,16 +1,22 @@
 {
-	"name": "@workerstack/system-e2e-app",
-	"version": "0.0.1",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"test": "bun test tests",
-		"type:check": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@workerstack/system": "workspace:*"
-	},
-	"devDependencies": {
-		"typescript": "catalog:"
-	}
+  "name": "@workerstack/system-e2e-app",
+  "private": true,
+  "bin": {
+    "catalog-install": "./scripts/catalog-install.ts"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "test": "bun --bun vitest run",
+    "test:real-install": "bun --bun vitest run -c vitest.real-install.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workerstack/system": "workspace:*",
+    "@workerstack/system-example-consumer": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
 }

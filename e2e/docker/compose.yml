@@ -9,8 +9,7 @@ services:
       - ../..:/src
     environment:
       EXPECT_OS: linux-apt
-      WORKERSTACK_SYSTEM_REAL_INSTALL: "1"
-    command: ["bun", "test", "e2e/app/tests/os-install.test.ts"]
+    command: ["bash", "-c", "cd e2e/app && bun --bun vitest run tests/os-install.test.ts && bun run test:real-install"]
 
   linux-dnf:
     image: system-e2e-dnf
@@ -22,8 +21,7 @@ services:
       - ../..:/src
     environment:
       EXPECT_OS: linux-dnf
-      WORKERSTACK_SYSTEM_REAL_INSTALL: "1"
-    command: ["bun", "test", "e2e/app/tests/os-install.test.ts"]
+    command: ["bash", "-c", "cd e2e/app && bun --bun vitest run tests/os-install.test.ts && bun run test:real-install"]
 
   linux-pacman:
     image: system-e2e-pacman
@@ -35,8 +33,7 @@ services:
       - ../..:/src
     environment:
       EXPECT_OS: linux-pacman
-      WORKERSTACK_SYSTEM_REAL_INSTALL: "1"
-    command: ["bun", "test", "e2e/app/tests/os-install.test.ts"]
+    command: ["bash", "-c", "cd e2e/app && bun --bun vitest run tests/os-install.test.ts && bun run test:real-install"]
 
   windows:
     image: system-e2e-apt
@@ -49,7 +46,7 @@ services:
     environment:
       WORKERSTACK_SYSTEM_OS: windows
       EXPECT_OS: windows
-    command: ["bun", "test", "e2e/app/tests/os-install.test.ts"]
+    command: ["bash", "-c", "cd e2e/app && bun --bun vitest run tests/os-install.test.ts"]
 
   macos:
     image: system-e2e-apt
@@ -62,4 +59,4 @@ services:
     environment:
       WORKERSTACK_SYSTEM_OS: macos
       EXPECT_OS: macos
-    command: ["bun", "test", "e2e/app/tests/os-install.test.ts"]
+    command: ["bash", "-c", "cd e2e/app && bun --bun vitest run tests/os-install.test.ts"]

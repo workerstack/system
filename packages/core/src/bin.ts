@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import { main } from "./main.ts"
-import { nodeRuntime } from "./runtime.ts"
+import { main } from "./main.ts";
 
-process.exit(await main(process.argv.slice(2), nodeRuntime()))
+await main();

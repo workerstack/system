@@ -1,0 +1,5 @@
+{
+  // exclude replaces tsconfig.json's own: its entries, then the tool-loaded config files
+  "exclude": ["node_modules", ".tmp", "*.config.ts", "*.config.local.ts"],
+  "extends": ["./tsconfig.json", "@workerstack/repo/tsconfig/strict"]
+}

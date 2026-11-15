@@ -2,16 +2,21 @@
  * Version parsing and matching for `check` and `install`.
  */
 
-const DEFAULT_PATTERN = /(\d+\.\d+[\w.-]*)/
+import { LATEST } from "./latest.constants.ts";
+
+const DEFAULT_PATTERN = /(\d+\.\d+[\w.-]*)/;
+const V_PREFIX = /^v/;
+const PRERELEASE_OR_BUILD = /[-+]/;
 
 /** The first capture of `pattern` (a regex source), else the first dotted version, else null. */
 export function parseVersion(output: string, pattern?: string): string | null {
-	const match = output.match(pattern === undefined ? DEFAULT_PATTERN : new RegExp(pattern))
-	return match?.[1] ?? null
+  const match = output.match(pattern === undefined ? DEFAULT_PATTERN : new RegExp(pattern));
+
+  return match?.[1] ?? null;
 }
 
 function strip(version: string): string {
-	return version.replace(/^v/, "")
+  return version.replace(V_PREFIX, "");
 }
 
 /**
@@ -24,10 +29,16 @@ function strip(version: string): string {
  * - A prerelease (`-beta.12`) on either side must match exactly.
  */
 export function versionsMatch(installed: string, expected: string): boolean {
-	if (expected === "latest") return true
-	const want = strip(expected)
-	const have = want.includes("+") ? strip(installed) : (strip(installed).split("+")[0] as string)
-	if (/[-+]/.test(have) || /[-+]/.test(want)) return have === want
-	const haveParts = have.split(".")
-	return want.split(".").every((part, i) => haveParts[i] === part)
+  if (expected === LATEST) return true;
+
+  const want = strip(expected);
+
+  const have = want.includes("+")
+    ? strip(installed)
+    : (strip(installed).split("+")[0] /* split always yields a first element */ as string);
+
+  if (PRERELEASE_OR_BUILD.test(have) || PRERELEASE_OR_BUILD.test(want)) return have === want;
+  const haveParts = have.split(".");
+
+  return want.split(".").every((part, i) => haveParts[i] === part);
 }

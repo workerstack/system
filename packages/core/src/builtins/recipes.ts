@@ -4,19 +4,25 @@
  * under `%LOCALAPPDATA%\Programs`), which the command adds to the user PATH.
  */
 
-import type { EnvVar, OsCommands, OsTarget } from "../config.ts"
-import type { Arch } from "./types.ts"
+import type { EnvVar, OsCommands, OsTarget, SystemDepConfig } from "../config.ts";
+import type { Arch } from "./types.ts";
 
-export const LOCAL_BIN = "$HOME/.local/bin"
-export const LOCAL_SHARE = "$HOME/.local/share"
-export const WIN_BIN = "$env:LOCALAPPDATA\\bin"
-export const WIN_PROGRAMS = "$env:LOCALAPPDATA\\Programs"
+/** A version check a recipe builds: the command, and the pattern when the default does not fit. */
+type VersionCheck = NonNullable<SystemDepConfig["check"]>;
 
-const CLEANUP = 'rm -rf "$tmp"'
+/** A gzipped tarball's extension. */
+const GZIP_TARBALL = /\.(tar\.gz|tgz)$/;
+
+export const LOCAL_BIN = "$HOME/.local/bin";
+export const LOCAL_SHARE = "$HOME/.local/share";
+export const WIN_BIN = "$env:LOCALAPPDATA\\bin";
+export const WIN_PROGRAMS = "$env:LOCALAPPDATA\\Programs";
+
+const CLEANUP = 'rm -rf "$tmp"';
 
 /** The same command on every Linux distro, and one for macOS. */
 export function unix(linux: string, macos: string): OsCommands {
-	return { "linux-apt": linux, "linux-dnf": linux, "linux-pacman": linux, macos }
+  return { "linux-apt": linux, "linux-dnf": linux, "linux-pacman": linux, macos };
 }
 
 /**
@@ -24,19 +30,20 @@ export function unix(linux: string, macos: string): OsCommands {
  * XDG_CACHE_HOME when set, so the dir bun's env block puts on PATH is named explicitly.
  */
 export function bunGlobal(pkg: string, version: string): OsCommands {
-	const command = `bun i -g ${pkg}@${version}`
-	const pinned = `BUN_INSTALL_BIN="$HOME/.bun/bin" ${command}`
-	return { ...unix(pinned, pinned), windows: command }
+  const command = `bun i -g ${pkg}@${version}`;
+  const pinned = `BUN_INSTALL_BIN="$HOME/.bun/bin" ${command}`;
+
+  return { ...unix(pinned, pinned), windows: command };
 }
 
 /** The value for this CPU. */
 export function pick<T>(arch: Arch, values: { arm64: T; x64: T }): T {
-	return values[arch]
+  return values[arch];
 }
 
 /** Download one executable into `$HOME/.local/bin/<name>`. */
 export function binary(url: string, name: string): string {
-	return `mkdir -p "${LOCAL_BIN}" && curl -fsSL "${url}" -o "${LOCAL_BIN}/${name}" && chmod +x "${LOCAL_BIN}/${name}"`
+  return `mkdir -p "${LOCAL_BIN}" && curl -fsSL "${url}" -o "${LOCAL_BIN}/${name}" && chmod +x "${LOCAL_BIN}/${name}"`;
 }
 
 /**
@@ -44,78 +51,92 @@ export function binary(url: string, name: string): string {
  * that look up their bundle beside themselves, so a symlink would break them.
  */
 export function launcher(name: string, target: string): string {
-	const file = `${LOCAL_BIN}/${name}`
-	return `mkdir -p "${LOCAL_BIN}" && printf '#!/bin/sh\\nexec "%s" "$@"\\n' "${target}" > "${file}" && chmod +x "${file}"`
+  const file = `${LOCAL_BIN}/${name}`;
+
+  const script = `printf '#!/bin/sh\\nexec "%s" "$@"\\n' "${target}" > "${file}"`;
+
+  return `mkdir -p "${LOCAL_BIN}" && ${script} && chmod +x "${file}"`;
 }
 
 /** Install OS packages through apt, refreshing its package lists first: a stale list 404s on a moved package. */
 export function apt(...packages: string[]): string {
-	return `sudo apt-get update && sudo apt-get install -y ${packages.join(" ")}`
+  return `sudo apt-get update && sudo apt-get install -y ${packages.join(" ")}`;
 }
 
 /** Download a vendor package and install it with its dependencies: `.deb` through apt, `.rpm` through dnf. */
 export function linuxPackage(url: string, kind: "deb" | "rpm"): string {
-	const file = `"$tmp/package.${kind}"`
-	const install = kind === "deb" ? apt(file) : `sudo dnf install -y ${file}`
-	return `tmp="$(mktemp -d)" && curl -fsSL "${url}" -o ${file} && ${install} && ${CLEANUP}`
+  const file = `"$tmp/package.${kind}"`;
+  const install = kind === "deb" ? apt(file) : `sudo dnf install -y ${file}`;
+
+  return `tmp="$(mktemp -d)" && curl -fsSL "${url}" -o ${file} && ${install} && ${CLEANUP}`;
 }
 
 /** Build and install an AUR package. makepkg refuses root, so this runs as a normal user with sudo. */
 export function aur(pkg: string): string {
-	return [
-		"sudo pacman -S --needed --noconfirm base-devel git",
-		'tmp="$(mktemp -d)"',
-		`git clone --depth 1 "https://aur.archlinux.org/${pkg}.git" "$tmp/${pkg}"`,
-		`(cd "$tmp/${pkg}" && makepkg -si --noconfirm)`,
-		CLEANUP,
-	].join(" && ")
+  return [
+    "sudo pacman -S --needed --noconfirm base-devel git",
+    'tmp="$(mktemp -d)"',
+    `git clone --depth 1 "https://aur.archlinux.org/${pkg}.git" "$tmp/${pkg}"`,
+    `(cd "$tmp/${pkg}" && makepkg -si --noconfirm)`,
+    CLEANUP,
+  ].join(" && ");
 }
 
-/** Download a macOS app zip and put its one `.app` into `$HOME/Applications` (replacing it). ditto keeps the bundle's symlinks. */
+/**
+ * Download a macOS app zip and put its one `.app` into `$HOME/Applications` (replacing it). ditto keeps the
+ * bundle's symlinks.
+ */
 export function macApp(url: string, app: string): string {
-	return [
-		'tmp="$(mktemp -d)"',
-		`curl -fsSL "${url}" -o "$tmp/app.zip"`,
-		'ditto -x -k "$tmp/app.zip" "$tmp/x"',
-		`rm -rf "$HOME/Applications/${app}"`,
-		'mkdir -p "$HOME/Applications"',
-		`mv "$(find "$tmp/x" -maxdepth 2 -name "*.app" | head -n 1)" "$HOME/Applications/${app}"`,
-		CLEANUP,
-	].join(" && ")
+  return [
+    'tmp="$(mktemp -d)"',
+    `curl -fsSL "${url}" -o "$tmp/app.zip"`,
+    'ditto -x -k "$tmp/app.zip" "$tmp/x"',
+    `rm -rf "$HOME/Applications/${app}"`,
+    'mkdir -p "$HOME/Applications"',
+    `mv "$(find "$tmp/x" -maxdepth 2 -name "*.app" | head -n 1)" "$HOME/Applications/${app}"`,
+    CLEANUP,
+  ].join(" && ");
 }
 
 /**
  * A Windows check that prints a file or registry value through PowerShell. It runs from cmd.exe, which
  * expands `%VAR%`; the single quotes keep paths with spaces whole.
  */
-export function winVersionCheck(expression: string): { command: string } {
-	return { command: `powershell -NoProfile -Command "${expression}"` }
+export function winVersionCheck(expression: string): VersionCheck {
+  return { command: `powershell -NoProfile -Command "${expression}"` };
 }
 
 /** The product version of an installed .exe, for GUI apps whose `--version` prints nothing on Windows. */
-export function winExeVersion(path: string): { command: string } {
-	return winVersionCheck(`(Get-Item '${path}').VersionInfo.ProductVersion`)
+export function winExeVersion(path: string): VersionCheck {
+  return winVersionCheck(`(Get-Item '${path}').VersionInfo.ProductVersion`);
+}
+
+/** tar's decompression flag for `url`'s extension: gzip, xz, or none for a plain tar. */
+function tarFlag(url: string): string {
+  if (GZIP_TARBALL.test(url)) return "z";
+
+  return url.endsWith(".tar.xz") ? "J" : "";
 }
 
 /** Unpack `$tmp/archive` into `$tmp/x`: unzip for .zip (GNU tar cannot), tar otherwise. */
 function extract(url: string): string {
-	if (url.endsWith(".zip")) return 'unzip -q "$tmp/archive" -d "$tmp/x"'
-	const flag = /\.(tar\.gz|tgz)$/.test(url) ? "z" : url.endsWith(".tar.xz") ? "J" : ""
-	return `tar -x${flag}f "$tmp/archive" -C "$tmp/x"`
+  if (url.endsWith(".zip")) return 'unzip -q "$tmp/archive" -d "$tmp/x"';
+
+  return `tar -x${tarFlag(url)}f "$tmp/archive" -C "$tmp/x"`;
 }
 
 function download(url: string): string[] {
-	return ['tmp="$(mktemp -d)"', `curl -fsSL "${url}" -o "$tmp/archive"`, 'mkdir "$tmp/x"', extract(url)]
+  return ['tmp="$(mktemp -d)"', `curl -fsSL "${url}" -o "$tmp/archive"`, 'mkdir "$tmp/x"', extract(url)];
 }
 
 /** Download an archive and install `member` (a path inside it) as `$HOME/.local/bin/<name>`. */
 export function archive(url: string, member: string, name: string): string {
-	return [
-		...download(url),
-		`mkdir -p "${LOCAL_BIN}"`,
-		`install -m 755 "$tmp/x/${member}" "${LOCAL_BIN}/${name}"`,
-		CLEANUP,
-	].join(" && ")
+  return [
+    ...download(url),
+    `mkdir -p "${LOCAL_BIN}"`,
+    `install -m 755 "$tmp/x/${member}" "${LOCAL_BIN}/${name}"`,
+    CLEANUP,
+  ].join(" && ");
 }
 
 /**
@@ -124,52 +145,53 @@ export function archive(url: string, member: string, name: string): string {
  * Each of `bins` (a path inside `dir`) is linked into `$HOME/.local/bin`.
  */
 export function tree(url: string, dir: string, opts: { bins?: readonly string[]; nested?: boolean } = {}): string {
-	const links = (opts.bins ?? []).map((bin) => `ln -sf "${dir}/${bin}" "${LOCAL_BIN}/${bin.split("/").pop()}"`)
-	return [
-		...download(url),
-		`rm -rf "${dir}"`,
-		`mkdir -p "$(dirname "${dir}")" "${LOCAL_BIN}"`,
-		opts.nested ? `mv "$tmp"/x/* "${dir}"` : `mv "$tmp/x" "${dir}"`,
-		...links,
-		CLEANUP,
-	].join(" && ")
+  const links = (opts.bins ?? []).map((bin) => `ln -sf "${dir}/${bin}" "${LOCAL_BIN}/${bin.split("/").pop()}"`);
+
+  return [
+    ...download(url),
+    `rm -rf "${dir}"`,
+    `mkdir -p "$(dirname "${dir}")" "${LOCAL_BIN}"`,
+    opts.nested === true ? `mv "$tmp"/x/* "${dir}"` : `mv "$tmp/x" "${dir}"`,
+    ...links,
+    CLEANUP,
+  ].join(" && ");
 }
 
 /** Stop on the first error and skip the progress bar (it slows Invoke-WebRequest badly). */
-const PS_PRELUDE = "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'"
+const PS_PRELUDE = "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'";
 
 /** Make `dir` exist and be on the user PATH. */
 export function winPathDir(dir: string): string {
-	return [
-		`$d = "${dir}"`,
-		"New-Item -ItemType Directory -Force $d | Out-Null",
-		'$u = [Environment]::GetEnvironmentVariable("Path", "User")',
-		'if (-not (($u -split ";") -contains $d)) { [Environment]::SetEnvironmentVariable("Path", "$d;$u", "User") }',
-	].join("; ")
+  return [
+    `$d = "${dir}"`,
+    "New-Item -ItemType Directory -Force $d | Out-Null",
+    '$u = [Environment]::GetEnvironmentVariable("Path", "User")',
+    'if (-not (($u -split ";") -contains $d)) { [Environment]::SetEnvironmentVariable("Path", "$d;$u", "User") }',
+  ].join("; ");
 }
 
 /** Download one .exe into `%LOCALAPPDATA%\bin\<name>.exe`. */
 export function winBinary(url: string, name: string): string {
-	return [
-		PS_PRELUDE,
-		winPathDir(WIN_BIN),
-		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "${WIN_BIN}\\${name}.exe"`,
-	].join("; ")
+  return [
+    PS_PRELUDE,
+    winPathDir(WIN_BIN),
+    `Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "${WIN_BIN}\\${name}.exe"`,
+  ].join("; ");
 }
 
-const WIN_TEMP = ["$t = Join-Path $env:TEMP ([guid]::NewGuid())", "New-Item -ItemType Directory $t | Out-Null"]
+const WIN_TEMP = ["$t = Join-Path $env:TEMP ([guid]::NewGuid())", "New-Item -ItemType Directory $t | Out-Null"];
 
 /** Download a zip and copy `member` (a path inside it) to `%LOCALAPPDATA%\bin\<name>.exe`. */
 export function winArchive(url: string, member: string, name: string): string {
-	return [
-		PS_PRELUDE,
-		winPathDir(WIN_BIN),
-		...WIN_TEMP,
-		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive.zip"`,
-		'Expand-Archive "$t\\archive.zip" "$t\\x"',
-		`Copy-Item "$t\\x\\${member}" "${WIN_BIN}\\${name}.exe" -Force`,
-		"Remove-Item -Recurse -Force $t",
-	].join("; ")
+  return [
+    PS_PRELUDE,
+    winPathDir(WIN_BIN),
+    ...WIN_TEMP,
+    `Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive.zip"`,
+    'Expand-Archive "$t\\archive.zip" "$t\\x"',
+    `Copy-Item "$t\\x\\${member}" "${WIN_BIN}\\${name}.exe" -Force`,
+    "Remove-Item -Recurse -Force $t",
+  ].join("; ");
 }
 
 /**
@@ -177,17 +199,18 @@ export function winArchive(url: string, member: string, name: string): string {
  * system tar.exe (bsdtar: gzip, bzip2, xz) otherwise. Named by path, since Git's GNU tar can shadow it on PATH.
  */
 function winExtract(url: string): string[] {
-	if (url.endsWith(".zip")) {
-		return [
-			`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive.zip"`,
-			'Expand-Archive "$t\\archive.zip" "$t\\x"',
-		]
-	}
-	return [
-		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive"`,
-		'New-Item -ItemType Directory "$t\\x" | Out-Null',
-		'& "$env:SystemRoot\\System32\\tar.exe" -xf "$t\\archive" -C "$t\\x"',
-	]
+  if (url.endsWith(".zip")) {
+    return [
+      `Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive.zip"`,
+      'Expand-Archive "$t\\archive.zip" "$t\\x"',
+    ];
+  }
+
+  return [
+    `Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\archive"`,
+    'New-Item -ItemType Directory "$t\\x" | Out-Null',
+    '& "$env:SystemRoot\\System32\\tar.exe" -xf "$t\\archive" -C "$t\\x"',
+  ];
 }
 
 /**
@@ -195,38 +218,40 @@ function winExtract(url: string): string[] {
  * `nested`: the archive holds one top folder, which becomes `dir`.
  */
 export function winTree(url: string, dir: string, opts: { bin?: string; nested?: boolean } = {}): string {
-	return [
-		PS_PRELUDE,
-		...WIN_TEMP,
-		...winExtract(url),
-		`if (Test-Path "${dir}") { Remove-Item -Recurse -Force "${dir}" }`,
-		`New-Item -ItemType Directory -Force (Split-Path "${dir}") | Out-Null`,
-		opts.nested
-			? `Move-Item (Get-ChildItem "$t\\x" -Directory | Select-Object -First 1).FullName "${dir}"`
-			: `Move-Item "$t\\x" "${dir}"`,
-		"Remove-Item -Recurse -Force $t",
-		winPathDir(opts.bin ? `${dir}\\${opts.bin}` : dir),
-	].join("; ")
+  return [
+    PS_PRELUDE,
+    ...WIN_TEMP,
+    ...winExtract(url),
+    `if (Test-Path "${dir}") { Remove-Item -Recurse -Force "${dir}" }`,
+    `New-Item -ItemType Directory -Force (Split-Path "${dir}") | Out-Null`,
+    opts.nested === true
+      ? `Move-Item (Get-ChildItem "$t\\x" -Directory | Select-Object -First 1).FullName "${dir}"`
+      : `Move-Item "$t\\x" "${dir}"`,
+    "Remove-Item -Recurse -Force $t",
+    winPathDir(opts.bin === undefined || opts.bin === "" ? dir : `${dir}\\${opts.bin}`),
+  ].join("; ");
 }
 
 /** Download a Windows installer and run it with `args` (its silent switches); fail on a non-zero exit. */
 export function winInstaller(url: string, args: readonly string[]): string {
-	return [
-		PS_PRELUDE,
-		...WIN_TEMP,
-		`Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\setup.exe"`,
-		`$p = Start-Process -Wait -PassThru -FilePath "$t\\setup.exe" -ArgumentList ${args.map((arg) => `'${arg}'`).join(",")}`,
-		'if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }',
-		"Remove-Item -Recurse -Force $t",
-	].join("; ")
+  const quoted = args.map((arg) => `'${arg}'`).join(",");
+
+  return [
+    PS_PRELUDE,
+    ...WIN_TEMP,
+    `Invoke-WebRequest -UseBasicParsing "${url}" -OutFile "$t\\setup.exe"`,
+    `$p = Start-Process -Wait -PassThru -FilePath "$t\\setup.exe" -ArgumentList ${quoted}`,
+    'if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }',
+    "Remove-Item -Recurse -Force $t",
+  ].join("; ");
 }
 
 /** A Windows command run in PowerShell with the stop-on-error prelude. */
 export function ps(...steps: string[]): string {
-	return [PS_PRELUDE, ...steps].join("; ")
+  return [PS_PRELUDE, ...steps].join("; ");
 }
 
 /** PATH entries for a tool in the per-user bin dirs: `$HOME/.local/bin` on unix, `%LOCALAPPDATA%\bin` on Windows. */
 export function localBinEnv(os: OsTarget): EnvVar[] {
-	return [{ path: os === "windows" ? WIN_BIN : LOCAL_BIN }]
+  return [{ path: os === "windows" ? WIN_BIN : LOCAL_BIN }];
 }

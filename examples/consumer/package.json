@@ -1,17 +1,20 @@
 {
-	"name": "@workerstack/system-example-consumer",
-	"version": "0.0.1",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"setup:deps": "system install",
-		"setup:deps:check": "system check",
-		"type:check": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@workerstack/system": "workspace:*"
-	},
-	"devDependencies": {
-		"typescript": "catalog:"
-	}
+  "name": "@workerstack/system-example-consumer",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./system.config.ts"
+  },
+  "scripts": {
+    "setup:deps": "system install",
+    "setup:deps:check": "system check",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workerstack/system": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }
