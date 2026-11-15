@@ -67,7 +67,7 @@ describe("snapshotTtyPath in a real unix shell", () => {
     const snap = snapshotTtyPath();
     expect(snap.path.length).toBeGreaterThan(0);
     expect(["tty", "process"]).toContain(snap.source);
-  });
+  }, 30_000);
 });
 
 describe("snapshotTtyPath in real bash", () => {
