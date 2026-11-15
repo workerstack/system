@@ -52,16 +52,6 @@
       }
     },
     {
-      "label": "prepare",
-      "type": "shell",
-      "command": "bun run prepare",
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
       "label": "test",
       "type": "shell",
       "command": "bun run test",
@@ -102,6 +92,16 @@
       }
     },
     {
+      "label": "test:real-install",
+      "type": "shell",
+      "command": "bun run test:real-install",
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
       "label": "test:unit",
       "type": "shell",
       "command": "bun run test:unit",
@@ -132,16 +132,6 @@
       }
     },
     {
-      "label": "typecheck:consumers",
-      "type": "shell",
-      "command": "bun run typecheck:consumers",
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
       "label": "workerstack:system-e2e-app:test",
       "type": "shell",
       "command": "bun run test",
@@ -155,9 +145,22 @@
       }
     },
     {
-      "label": "workerstack:system-e2e-app:type:check",
+      "label": "workerstack:system-e2e-app:test:real-install",
       "type": "shell",
-      "command": "bun run type:check",
+      "command": "bun run test:real-install",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e/app"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "workerstack:system-e2e-app:typecheck",
+      "type": "shell",
+      "command": "bun run typecheck",
       "options": {
         "cwd": "${workspaceFolder}/e2e/app"
       },
@@ -194,9 +197,9 @@
       }
     },
     {
-      "label": "workerstack:system-example-consumer:type:check",
+      "label": "workerstack:system-example-consumer:typecheck",
       "type": "shell",
-      "command": "bun run type:check",
+      "command": "bun run typecheck",
       "options": {
         "cwd": "${workspaceFolder}/examples/consumer"
       },
@@ -246,22 +249,9 @@
       }
     },
     {
-      "label": "workerstack:system:type:check",
+      "label": "workerstack:system:typecheck",
       "type": "shell",
-      "command": "bun run type:check",
-      "options": {
-        "cwd": "${workspaceFolder}/packages/core"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "workerstack:system:type:check:tests",
-      "type": "shell",
-      "command": "bun run type:check:tests",
+      "command": "bun run typecheck",
       "options": {
         "cwd": "${workspaceFolder}/packages/core"
       },

@@ -15,7 +15,7 @@ packages/core           the published package (@workerstack/system)
 examples/consumer       a real consumer: the whole workerstack catalog plus one custom dep
 e2e/app                 fixture configs, CLI and catalog tests over workspace:*
 e2e/docker              apt / dnf / pacman images
-e2e/catalog-install.ts  real install of one catalog group on this machine, then a version check
+e2e/app/scripts/catalog-install.ts  real install of one catalog group on this machine, then a version check
 ```
 
 `packages/core` is the only published workspace.
@@ -29,17 +29,18 @@ bun install
 bun run test                 # unit tests, 100% line/branch/function/statement coverage gate
 bun run test:unit            # the same without coverage
 bun run test:consumers       # e2e app, catalog dry-runs on every OS target
-bun run typecheck            # src and tests
-bun run typecheck:consumers  # examples and e2e app, including @ts-expect-error config cases
+bun run typecheck            # every package: core src and tests, examples, e2e app
+bun run test:real-install    # real installs of a few deps; changes this machine
 bun run lint                 # oxlint
+bun repo check               # what the pre-commit hook runs: lint, knip, tsconfigs, manifests, generated files
 bun run fmt                  # oxfmt (fmt:check in CI)
 bun run test:e2e:docker      # apt / dnf / pacman install paths in Docker
-bun e2e/catalog-install.ts --group languages   # real installs; changes this machine
+bun e2e/app/scripts/catalog-install.ts --group languages   # real installs; changes this machine
 ```
 
-Commands take a `Runtime` (`src/runtime.ts`) for every effect, so unit tests drive them with `tests/unit/fake-runtime.ts` and only `src/bin.ts` touches `process`. `e2e/catalog-install.ts` reads `WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS` (default 600000 per dep).
+Commands take a `Runtime` (`src/runtime.ts`) for every effect, so unit tests drive them with `tests/unit/fake-runtime.ts` and `src/env.ts` is the one module that reads `process.env`. `e2e/app/scripts/catalog-install.ts` reads `WORKERSTACK_SYSTEM_INSTALL_TIMEOUT_MS` (default 600000 per dep).
 
-Adding a built-in: add it to its group file in `src/builtins/`, run `bun run test` (the catalog tests resolve every built-in on every OS and CPU), add its pinned version to `examples/consumer/system.config.ts`, and add its row to the package README table (a test checks every built-in is listed).
+Adding a built-in: add it to its group file in `src/builtins/`, run `bun run test` (the catalog tests resolve every built-in on every OS and CPU), add its pinned version to `examples/consumer/system.config.ts`, and add its row to the table in `packages/core/references/catalog.md`, then `bun repo sync` regenerates the package README (a test checks every built-in is listed).
 
 ## CI
 
@@ -47,7 +48,8 @@ Adding a built-in: add it to its group file in `src/builtins/`, run `bun run tes
 
 | Job                              | Runs                                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `lint`                           | fmt check, oxlint, both typechecks                                                                      |
+| `commits`                        | every pushed commit's message, through `bun repo commit-msg`                                            |
+| `lint`                           | fmt check, `bun repo check`, typecheck                                                                  |
 | `test`                           | unit tests with the coverage gate on Ubuntu; without it on macOS and Windows; consumer e2e on all three |
 | `docker e2e`                     | apt / dnf / pacman install-path tests                                                                   |
 | `catalog install`                | every catalog group really installed on Ubuntu, macOS and Windows, then checked for the pinned version  |

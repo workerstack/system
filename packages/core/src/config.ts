@@ -8,12 +8,16 @@
  *   {{arch}}    — CPU architecture: "arm64" or "amd64" (auto-detected)
  */
 
-import type { BuiltinName } from "./builtins/index.ts"
-import type { BuiltinOverride } from "./builtins/types.ts"
+import type { BuiltinName } from "./builtins/catalog.ts";
+import type { BuiltinOverride } from "./builtins/types.ts";
+import { nonEmpty } from "./non-empty.ts";
+import { ARM64_ARCH } from "./platform.constants.ts";
 
-export const OS_TARGETS = ["linux-apt", "linux-dnf", "linux-pacman", "macos", "windows"] as const
+/** Every OS a dep can have an install command for: three Linux package managers, macOS and Windows. */
+export const OS_TARGETS = ["linux-apt", "linux-dnf", "linux-pacman", "macos", "windows"] as const;
 
-export type OsTarget = (typeof OS_TARGETS)[number]
+/** One of `OS_TARGETS`: the key of an install command in `os`. */
+export type OsTarget = (typeof OS_TARGETS)[number];
 
 /**
  * Per-OS install commands.
@@ -23,7 +27,10 @@ export type OsTarget = (typeof OS_TARGETS)[number]
  * - Omit an OS key (without "all") = unavailable on that OS
  * - Set an OS key to `false` = explicitly unavailable on that OS (overrides "all")
  */
-export type OsCommands = Partial<Record<OsTarget, string | false>> & { all?: string }
+export type OsCommands = Partial<Record<OsTarget, string | false>> & {
+  /** the command for every OS without its own key */
+  all?: string;
+};
 
 /**
  * One shell environment entry, written verbatim into the managed rc block (the shell expands `$HOME`).
@@ -32,58 +39,96 @@ export type OsCommands = Partial<Record<OsTarget, string | false>> & { all?: str
  * - `{ key, detect, fallback? }` sets a variable to the first `detect` path that exists, else `fallback`.
  */
 export type EnvVar =
-	| { path: string }
-	| { key: string; value: string }
-	| { detect: readonly string[]; fallback?: string; key: string }
+  | {
+      /** directory to put first on PATH */
+      path: string;
+    }
+  | {
+      /** variable name */
+      key: string;
+      /** value written verbatim */
+      value: string;
+    }
+  | {
+      /** candidate paths, in order; the first that exists is the value */
+      detect: readonly string[];
+      /** the value when no `detect` path exists; without it the variable is left out */
+      fallback?: string;
+      /** variable name */
+      key: string;
+    };
 
-export interface SystemDepConfig {
-	description: string
-	required: boolean
-	version: string
-	/** Per-OS install commands. Supports {{name}}, {{version}}, {{major}} templates. */
-	os: OsCommands
-	/**
-	 * Version check command. Supports {{name}} template.
-	 * Default: "{{name}} --version" — only declare when it differs.
-	 */
-	check?: {
-		command: string
-		/** Regex source whose first capture is the version. Default: the first `N.N…` in the output. */
-		pattern?: string
-	}
-	/** Deps that must be installed before this one (by dep key name) */
-	dependsOn?: readonly string[]
-	/** Env vars to configure after install */
-	env?: readonly EnvVar[]
-}
+/** A full dep: what it is, the pinned version, and how to install and check it on each OS. */
+export type SystemDepConfig = {
+  /** one line on what the dep is, printed under it by `install` */
+  description: string;
+  /** whether a missing dep fails `check` and a failed install fails `install` */
+  required: boolean;
+  /** the pinned version, matched by dot-segment prefix, or `latest` for any */
+  version: string;
+  /** Per-OS install commands. Supports {{name}}, {{version}}, {{major}} templates. */
+  os: OsCommands;
+  /**
+   * Version check command. Supports {{name}} template.
+   * Default: "{{name}} --version" — only declare when it differs.
+   */
+  check?: {
+    /** the command whose output reports the version */
+    command: string;
+    /** Regex source whose first capture is the version. Default: the first `N.N…` in the output. */
+    pattern?: string;
+  };
+  /** Deps that must be installed before this one (by dep key name) */
+  dependsOn?: readonly string[];
+  /** Env vars to configure after install */
+  env?: readonly EnvVar[];
+};
 
 /**
  * One `deps` entry. A built-in name takes its version (`go: "1.27.2"`) or an override object
  * (`{ version, ...fields to replace, os merged per key }`); any other name is a full custom dep.
  */
-export type DepEntry<K extends PropertyKey> = K extends BuiltinName ? BuiltinOverride | string : SystemDepConfig
+export type DepEntry<K extends PropertyKey> = K extends BuiltinName ? BuiltinOverride | string : SystemDepConfig;
 
-export interface SystemConfig<
-	D extends Record<string, unknown> = Record<string, BuiltinOverride | SystemDepConfig | string>,
-> {
-	deps: { [K in keyof D]: DepEntry<K> }
-	/** package.json whose `packageManager` follows the bun pin. Relative to the config file. */
-	packageJsonPath?: string
-}
+/** What `system.config.ts` exports: the deps, and the package.json whose `packageManager` follows bun. */
+export type SystemConfig<
+  D extends Record<string, unknown> = Record<string, BuiltinOverride | SystemDepConfig | string>,
+> = {
+  /** dep key → built-in version or override, or a full custom dep */
+  deps: { [K in keyof D]: DepEntry<K> };
+  /** package.json whose `packageManager` follows the bun pin. Relative to the config file. */
+  packageJsonPath?: string;
+};
 
 /** `{{arch}}` value: "arm64" on arm64, "amd64" everywhere else. */
 export function archLabel(arch: string = process.arch): "amd64" | "arm64" {
-	return arch === "arm64" ? "arm64" : "amd64"
+  return arch === ARM64_ARCH ? ARM64_ARCH : "amd64";
 }
 
+/** The values a template fills in. */
+export type TemplateVars = {
+  /** `process.arch` to label as `{{arch}}`; default this process's */
+  arch?: string;
+  /** `{{name}}`: the dep key */
+  name: string;
+  /** `{{version}}`, and `{{major}}` from its first dot segment */
+  version: string;
+};
+
 /** Replace {{name}}, {{version}}, {{major}} and {{arch}} in a template. */
-export function interpolate(template: string, name: string, version: string, arch: string = process.arch): string {
-	const major = version.split(".")[0] as string
-	return template
-		.replace(/\{\{name\}\}/g, name)
-		.replace(/\{\{version\}\}/g, version)
-		.replace(/\{\{major\}\}/g, major)
-		.replace(/\{\{arch\}\}/g, archLabel(arch))
+export function renderTemplate(template: string, { arch = process.arch, name, version }: TemplateVars): string {
+  const major = version.split(".")[0] /* split always yields a first element */ as string;
+
+  return template
+    .replaceAll("{{name}}", name)
+    .replaceAll("{{version}}", version)
+    .replaceAll("{{major}}", major)
+    .replaceAll("{{arch}}", archLabel(arch));
+}
+
+/** Replace {{name}}, {{version}}, {{major}} and {{arch}} (this process's) in a template. */
+export function interpolate(template: string, name: string, version: string): string {
+  return renderTemplate(template, { name, version });
 }
 
 /**
@@ -91,16 +136,17 @@ export function interpolate(template: string, name: string, version: string, arc
  * Returns the interpolated command, or null if unavailable.
  */
 export function resolveOsCommand(name: string, config: SystemDepConfig, target: OsTarget): string | null {
-	const specific = config.os[target]
+  const specific = config.os[target];
 
-	/* explicitly unavailable */
-	if (specific === false) return null
+  // explicitly unavailable
+  if (specific === false) return null;
 
-	/* prefer specific OS command, fall back to "all" */
-	const raw = specific ?? config.os.all
-	if (!raw) return null
+  // prefer specific OS command, fall back to "all"
+  const raw = nonEmpty(specific ?? config.os.all);
 
-	return interpolate(raw, name, config.version)
+  if (raw === undefined) return null;
+
+  return interpolate(raw, name, config.version);
 }
 
 /**
@@ -108,16 +154,28 @@ export function resolveOsCommand(name: string, config: SystemDepConfig, target: 
  * Default: "{name} --version"
  */
 export function resolveCheckCommand(name: string, config: SystemDepConfig): string {
-	const raw = config.check?.command ?? "{{name}} --version"
-	return interpolate(raw, name, config.version)
+  const raw = config.check?.command ?? "{{name}} --version";
+
+  return interpolate(raw, name, config.version);
 }
+
+/** A config as `defineConfig` returns it, with each dep entry's own type. */
+export type DefinedConfig<D extends Record<string, unknown>> = {
+  /** dep key → entry, as written */
+  deps: D;
+  /** package.json whose `packageManager` follows the bun pin. Relative to the config file. */
+  packageJsonPath?: string;
+};
 
 /**
  * Type a `system.config.ts` default export. Each key is checked on its own: a built-in name takes a
  * version string or override object, any other name a full `SystemDepConfig`.
  */
 export function defineConfig<const D extends Record<string, unknown>>(
-	config: SystemConfig<D> & { deps: D },
-): { deps: D; packageJsonPath?: string } {
-	return config
+  config: SystemConfig<D> & {
+    /** dep key → entry; each key is checked against `DepEntry` on its own */
+    deps: D;
+  },
+): DefinedConfig<D> {
+  return config;
 }

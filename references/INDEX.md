@@ -6,9 +6,10 @@
 - [@workerstack/system](../packages/core/references/INDEX.md): References
 <!-- /repo:packages -->
 
-<!-- repo:stack 3f8ba17c -->
+<!-- repo:stack e3e03690 -->
 - [@workerstack/repo](../node_modules/@workerstack/repo/references/INDEX.md)
 - [@workerstack/system](../node_modules/@workerstack/system/references/INDEX.md)
+- [@workerstack/system-example-consumer](../node_modules/@workerstack/system-example-consumer/references/INDEX.md)
 <!-- /repo:stack -->
 
 <!-- repo:available 10ef8736 -->

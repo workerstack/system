@@ -1,7 +1,5 @@
 {
-	"extends": "../../tsconfig.base.json",
-	"compilerOptions": {
-		"types": ["node"]
-	},
-	"include": ["src/**/*", "tests/**/*"]
+  "exclude": ["node_modules", ".tmp", "coverage"],
+  "extends": "../../tsconfig.base.json",
+  "include": ["**/*.ts"]
 }

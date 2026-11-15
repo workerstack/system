@@ -1,49 +1,49 @@
 {
-	"name": "@workerstack/system",
-	"version": "0.4.0",
-	"description": "Every OS dependency workerstack needs, installed by one command. Define deps in system.config.ts, run system install.",
-	"keywords": [
-		"cli",
-		"cross-platform",
-		"dependencies",
-		"installer",
-		"system"
-	],
-	"homepage": "https://github.com/workerstack/system#readme",
-	"bugs": {
-		"url": "https://github.com/workerstack/system/issues"
-	},
-	"license": "MIT",
-	"author": "workerstack",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/workerstack/system.git"
-	},
-	"bin": {
-		"system": "./src/bin.ts"
-	},
-	"files": [
-		"src"
-	],
-	"type": "module",
-	"sideEffects": false,
-	"exports": {
-		".": "./src/index.ts"
-	},
-	"publishConfig": {
-		"access": "public"
-	},
-	"scripts": {
-		"test": "vitest run --coverage",
-		"test:unit": "vitest run",
-		"test:watch": "vitest",
-		"type:check": "tsc --noEmit -p tsconfig.src.json && tsc --noEmit",
-		"type:check:tests": "tsc --noEmit"
-	},
-	"devDependencies": {
-		"@types/node": "catalog:",
-		"@vitest/coverage-v8": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
-	}
+  "name": "@workerstack/system",
+  "version": "0.4.0",
+  "private": false,
+  "description": "Every OS dependency workerstack needs, installed by one command. Define deps in system.config.ts, run system install.",
+  "keywords": [
+    "cli",
+    "cross-platform",
+    "dependencies",
+    "installer",
+    "system"
+  ],
+  "homepage": "https://github.com/workerstack/system#readme",
+  "bugs": {
+    "url": "https://github.com/workerstack/system/issues"
+  },
+  "license": "MIT",
+  "author": "workerstack",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/workerstack/system.git"
+  },
+  "bin": {
+    "system": "./src/bin.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run --coverage",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
 }
