@@ -44,9 +44,7 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - run: bun run fmt:check
-      - run: bun repo check
-      - run: bun run typecheck
+      - run: bun repo ci
 
   test:
     name: test

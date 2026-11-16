@@ -34,7 +34,8 @@ bun run typecheck            # every package: core and the playground
 bun run test:real-install    # real installs of a few deps; changes this machine
 bun run lint                 # oxlint
 bun repo check               # what the pre-commit hook runs: lint, knip, tsconfigs, manifests, generated files
-bun run fmt                  # oxfmt (fmt:check in CI)
+bun run fmt                  # oxfmt
+bun repo ci                  # every standards gate, as the CI lint job runs it
 bun run test:e2e:docker      # apt / dnf / pacman install paths in Docker
 bun run test:catalog-install --group languages   # real installs; changes this machine
 ```
@@ -50,7 +51,7 @@ Adding a built-in: add it to its group file in `src/builtins/`, run `bun run tes
 | Job                              | Runs                                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `commits`                        | every pushed commit's message, through `bun repo commit-msg`                                            |
-| `lint`                           | fmt check, `bun repo check`, typecheck                                                                  |
+| `lint`                           | `bun repo ci`: every standards gate (check, docs, fmt, typecheck, tests)                                |
 | `test`                           | unit tests with the coverage gate on Ubuntu; without it on macOS and Windows; consumer e2e on all three |
 | `docker e2e`                     | apt / dnf / pacman install-path tests                                                                   |
 | `catalog install`                | every catalog group really installed on Ubuntu, macOS and Windows, then checked for the pinned version  |
